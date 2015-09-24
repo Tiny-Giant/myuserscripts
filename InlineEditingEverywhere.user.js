@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Inline Editing Everywhere
-// @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.1
-// @description  Enables inline editing on any site in the Stack Exchange network.
-// @author       @TinyGiant
-// @include      /^https?://(meta\.)?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/(questions|posts|review)/.*/
-// @grant        none
+// @name           Inline Editing Everywhere
+// @namespace      https://github.com/Tiny-Giant/
+// @version        1.0.0.2
+// @description    Enables inline editing on any site in the Stack Exchange network.
+// @author         @TinyGiant
+// @grant          none
+// @include        /^https?://(meta\.)?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/(questions|posts|review)/(?!tagged|new).*/
 // ==/UserScript==
 
 function crossFade(outElem, inElem, duration, callback) {
