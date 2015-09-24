@@ -1,46 +1,37 @@
 // ==UserScript==
 // @name           Review Audit Finder
 // @namespace      https://github.com/Tiny-Giant/
-// @version        1.0.0.2
+// @version        1.0.0.3
 // @description    Finds real post scores in the review queues and puts it under the assumed score, also signals if it is an audit.
 // @author         @TinyGiant
 // @include        /^https?://\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/review/.*/
 // @grant          none
 // ==/UserScript==
 
-$('#hmenus').before($('<h1 id="isaudit"></h1>').css({'margin':'0','padding':'0','transform':'translate(15%, 70%)','box-sizing':'border-box'}));
-$(document).ajaxComplete(function() { 
-    if(/review.next\-task|review.task\-reviewed/.test(arguments[2].url)) {
-        var postData = JSON.parse(arguments[1].responseText);
-        if(!postData.postTypeId) return;
-        $('#isaudit').html('Audit: ' + (postData.isAudit ? '<span style="color:green">Yes</span>' : '<span style="color:green">No</span>'));
-        getScores(postData);
-    }
-});
-function getScores(postData){
-    setTimeout(function(){
-        var $score = $('.vote');
-        var postId = postData.postId;
-        console.log(postId);
-        $.ajax({
-            type: 'GET',
-            url: '/posts/' + postId + '/vote-counts',
-            dataType: "json",
-            success: function (json) {
-                StackExchange.helpers.removeMessages();
+(function(){
+    var headerWidth = $('#header').width();
+    var logoWidth = $('#hlogo').width();
+    var navWidth = $('#hmenus').width();
+    var availableWidth = headerWidth - (logoWidth + navWidth);
 
-                var html =
-                    '<div style="color:green">' + json.up + '</div>' +
-                    '<div class="vote-count-separator"></div>' +
-                    '<div style="color:maroon">' + json.down + '</div>';
+    var auditHolder = $('<div/>').css({'position':'absolute','left':logoWidth + 'px','font-size':'3em','line-height':'75px','width':availableWidth + 'px','text-align':'center'});
+    $('#hmenus').before(auditHolder);
 
-                $score
-                .html($score.html() + '<br>' + html)
-                .unbind('click')
-                .data('bound', false)
-                .css('cursor', 'default')
-                .attr('title', (function(n){return n.upCount==1&&n.downCount==1?n.upCount+" up / "+n.downCount+" down":n.upCount==1?n.upCount+" up / "+n.downCount+" down":(n.downCount==1,n.upCount+" up / "+n.downCount+" down")})({upCount:Math.abs(+json.up),downCount:Math.abs(+json.down)}));
-            }
-        });
-    }, 1000);
-}
+    $(document).ajaxComplete(function() { 
+        if(/review.next\-task|review.task\-reviewed/.test(arguments[2].url)) {
+            var postData = JSON.parse(arguments[1].responseText);
+            if(!postData.postTypeId) return;
+            auditHolder.html(postData.isAudit ? '<span style="color:maroon">This is an audit!</span>' : '<span style="color:green">This is not an audit.</span>');
+            $.ajax({
+                type: 'GET',
+                url: '/posts/' + postData.postId + '/vote-counts',
+                dataType: "json",
+                success: function (json) {
+                    $('.vote').after('<div class="vote"><div style="color:green">' + json.up + '</div>' +
+                                     '<div class="vote-count-separator"></div>' +
+                                     '<div style="color:maroon">' + json.down + '</div></div>');
+                }
+            });
+        }
+    });
+})();
