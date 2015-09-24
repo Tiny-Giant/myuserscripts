@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           Review Audit Finder
 // @namespace      https://github.com/Tiny-Giant/
-// @version        1.0.0.3
+// @version        1.0.0.4
 // @description    Finds real post scores in the review queues and puts it under the assumed score, also signals if it is an audit.
 // @author         @TinyGiant
 // @include        /^https?://\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/review/.*/
@@ -14,7 +14,7 @@
     var navWidth = $('#hmenus').width();
     var availableWidth = headerWidth - (logoWidth + navWidth);
 
-    var auditHolder = $('<div/>').css({'position':'absolute','left':logoWidth + 'px','font-size':'3em','line-height':'75px','width':availableWidth + 'px','text-align':'center'});
+    var auditHolder = $('<div/>').css({'position':'absolute','left':logoWidth + 'px','font-size':'2em','font-weight':'bold','line-height':'75px','width':availableWidth + 'px','text-align':'center'});
     $('#hmenus').before(auditHolder);
 
     $(document).ajaxComplete(function() { 
