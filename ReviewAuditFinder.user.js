@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Review Audit Finder
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.0
-// @description  Finds real post scores in the review queues and puts it under the assumed score
+// @version      1.0.0.1
+// @description  Finds real post scores in the review queues and puts it under the assumed score, also signals if it is an audit.
 // @author       @TinyGiant
 // @include      *://*.stackexchange.com/review/*
 // @include      *://stackoverflow.com/review/*
@@ -17,13 +17,24 @@
 // @grant        none
 // ==/UserScript==
 
-(function(){
+$('#hmenus').before($('<h2 id="isaudit"></h2>').css({'margin':'0','padding':'0','line-height':'75px'}));
+$(document).ajaxComplete(function() { 
+    if(/review.next\-task|review.task\-reviewed/.test(arguments[2].url)) {
+        var postData = JSON.parse(arguments[1].responseText);
+        if(!postData.postTypeId) return;
+        $('#isaudit').text('Audit: ' + (postData.isAudit ? 'Yes' : 'No'));
+        console.log(postData);
+        getScores(postData);
+    }
+});
+function getScores(postData){
     setTimeout(function(){
-        var $score = $('.vote');
-        var postId = $('.post-id').text();
+        var $score = $('.vote').clone(true).appendTo($('.vote').parent());
+        var postId = postData.postId;
+        console.log(postId);
         $.ajax({
             type: 'GET',
-            url: '/posts/{postId}/vote-counts'.formatUnicorn({ postId: postId }),
+            url: '/posts/' + postId + '/vote-counts',
             dataType: "json",
             success: function (json) {
                 StackExchange.helpers.removeMessages();
@@ -34,7 +45,7 @@
                     '<div style="color:maroon">' + json.down + '</div>';
 
                 $score
-                .html($score.html() + html)
+                .html(html)
                 .unbind('click')
                 .data('bound', false)
                 .css('cursor', 'default')
@@ -42,4 +53,4 @@
             }
         });
     }, 1000);
-})();
+}
