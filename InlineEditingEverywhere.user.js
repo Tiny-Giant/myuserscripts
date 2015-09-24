@@ -8,9 +8,6 @@
 // @grant        none
 // ==/UserScript==
 
-// Do this to ditch the existing inline editor
-$('.post-menu .edit-post').attr('class','suggest-edit-post');
-
 // Enable inline editing everywhere, even if you don't have the privilege.
 $('.post-menu .suggest-edit-post').live("click", function (evt) {
     if (evt.ctrlKey || evt.altKey || evt.metaKey || evt.shiftKey) return; // allow open new window etc
@@ -64,7 +61,6 @@ $('.post-menu .suggest-edit-post').live("click", function (evt) {
             var targetID = e.attr('href').match(/\d+/)[0];
 
             var cancelEdit = function (elem) {
-                delete Apps[targetID];
                 if (StackExchange.navPrevention) {
                     if (!StackExchange.navPrevention.confirm("You have started editing this post. Abandon this edit?"))
                         return false;
