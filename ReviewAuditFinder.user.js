@@ -1,35 +1,25 @@
 // ==UserScript==
-// @name         Review Audit Finder
-// @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.1
-// @description  Finds real post scores in the review queues and puts it under the assumed score, also signals if it is an audit.
-// @author       @TinyGiant
-// @include      *://*.stackexchange.com/review/*
-// @include      *://stackoverflow.com/review/*
-// @include      *://meta.stackoverflow.com/review/*
-// @include      *://serverfault.com/review/*
-// @include      *://meta.serverfault.com/review/*
-// @include      *://superuser.com/review/*
-// @include      *://meta.superuser.com/review/*
-// @include      *://askubuntu.com/review/*
-// @include      *://meta.askubuntu.com/review/*
-// @include      *://stackapps.com/review/*
-// @grant        none
+// @name           Review Audit Finder
+// @namespace      https://github.com/Tiny-Giant/
+// @version        1.0.0.2
+// @description    Finds real post scores in the review queues and puts it under the assumed score, also signals if it is an audit.
+// @author         @TinyGiant
+// @include        /^https?://\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/review/.*/
+// @grant          none
 // ==/UserScript==
 
-$('#hmenus').before($('<h2 id="isaudit"></h2>').css({'margin':'0','padding':'0','line-height':'75px'}));
+$('#hmenus').before($('<h1 id="isaudit"></h1>').css({'margin':'0','padding':'0','transform':'translate(15%, 70%)','box-sizing':'border-box'}));
 $(document).ajaxComplete(function() { 
     if(/review.next\-task|review.task\-reviewed/.test(arguments[2].url)) {
         var postData = JSON.parse(arguments[1].responseText);
         if(!postData.postTypeId) return;
-        $('#isaudit').text('Audit: ' + (postData.isAudit ? 'Yes' : 'No'));
-        console.log(postData);
+        $('#isaudit').html('Audit: ' + (postData.isAudit ? '<span style="color:green">Yes</span>' : '<span style="color:green">No</span>'));
         getScores(postData);
     }
 });
 function getScores(postData){
     setTimeout(function(){
-        var $score = $('.vote').clone(true).appendTo($('.vote').parent());
+        var $score = $('.vote');
         var postId = postData.postId;
         console.log(postId);
         $.ajax({
@@ -45,7 +35,7 @@ function getScores(postData){
                     '<div style="color:maroon">' + json.down + '</div>';
 
                 $score
-                .html(html)
+                .html($score.html() + '<br>' + html)
                 .unbind('click')
                 .data('bound', false)
                 .css('cursor', 'default')
