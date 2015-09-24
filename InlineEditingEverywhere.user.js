@@ -1,12 +1,18 @@
 // ==UserScript==
 // @name         Inline Editing Everywhere
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Enables inline editing on any site in the Stack Exchange network.
 // @author       @TinyGiant
 // @include      /^https?://(meta\.)?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/(questions|posts|review)/.*/
 // @grant        none
 // ==/UserScript==
+
+function crossFade(outElem, inElem, duration, callback) {
+    inElem.fadeIn(duration, callback);
+    outElem.hide();
+    return;
+}
 
 // Enable inline editing everywhere, even if you don't have the privilege.
 $('.post-menu .suggest-edit-post').live("click", function (evt) {
