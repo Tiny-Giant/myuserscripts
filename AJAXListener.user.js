@@ -8,6 +8,6 @@
 // @grant        none
 // ==/UserScript==
 
-$(document).on('load, ajaxComplete',function(){
+$(document).ajaxComplete(function(){
     console.log(arguments);
-})
+});
