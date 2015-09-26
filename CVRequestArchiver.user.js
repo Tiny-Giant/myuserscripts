@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
-// @namespace    http://your.homepage/
-// @version      1.0.0.1
+// @namespace    https://github.com/Tiny-Giant/
+// @version      1.0.0.2
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant
 // @match        http://chat.stackoverflow.com/rooms/*
@@ -11,72 +11,91 @@
 
 CVRequestArchiver();
 function CVRequestArchiver() {
+    var me, fkey, room, count, target, num, post, postchk, rnum;
+    var requests = [];
+    var ids = [];
     
-    var room = window.location.href;
-    var test = /chat.stackoverflow.com.rooms.(\d+)/.exec(room);
-    if(!test) return alert('We\'re not in a chat room...');
-    room = test[1];
+    me = /\d+/.exec($('#active-user').attr('class'));
+    if(!me) return alert('I couldn\'t find your user id number.');
+    me = me[0];
+
+    fkey = $('#fkey');
+    if(!fkey.length) return alert('I couldn\'t find your fkey.');
+    fkey = fkey.val();
+
+    room = /chat.stackoverflow.com.rooms.(\d+)/.exec(window.location.href);
+    if(!room) return alert('We\'re not in a chat room...');
+    room = room[1];
+
+    count = /\d+/.exec(prompt('How many messages should I scan?'));
+    if(!count) return alert('The string you entered doesn\'t contain a number.');
+    count = count[0];
+
+    target = /\d+/.exec(prompt('Where should I send any requests I find?'));
+    if(!target) return alert('Invalid room supplied, failing.');
+    target = target[0];
     
-    $.ajax({
-        data: 'ids=' + /\d+/.exec($('#active-user').attr('class'))[0] + '&roomId=' + room,
-        type: 'POST',
-        url: '/user/info',
-        success: function(resp) {
-            if(!resp.users[0].is_owner && !resp.users[0].is_moderator) return alert('You\'re not a room owner here.');
-            
-            var count = prompt('How many messages should I scan?');
-            var test = /\d+/.exec(count);
-            if(!test) return alert('The string you entered doesn\'t contain a number.');
-            count = test[0];
-            
-            $.ajax({
-                type: 'POST',
-                url: '/chats/' + room + '/events',
-                data: 'since=0&mode=Messages&msgCount=' + count + '&fkey=' + $('#fkey').val(),
-                success: function(resp){
-                    var requests = [];
-                    for(var i in resp.events) {
-                        var test = /^.a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z).+http:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+)/.exec(resp.events[i].content);
-                        if(test) requests.push({ msg: resp.events[i].message_id, post: +test[1], closed: false });
-                    }
-                    
-                    if(!requests.length) return alert('No requests found.');
-                    var num = requests.length - 1;
-                    
-                    var postchk = setInterval(function(){
-                        if(num === 0) clearInterval(postchk);
-                        GM_xmlhttpRequest({
-                            method: 'GET',
-                            url: 'http://stackoverflow.com/flags/questions/' + requests[num].post + '/close/popup',
-                            onload: function(resp){
-                                requests[num].closed = /This question is now closed/.test(resp.response);
-                                console.log(requests[num]);
-                                
-                                if(num-- !== 0) return;
-                                    
-                                var ids = [];
-                                for(var i in requests) if(requests[i].closed) ids.push(
-                                    requests[i].msg);
-                                if(!ids.length) return alert('No closed requests.');
-
-                                var target = prompt('Where should I send ' + (ids.length === 1 ? 'this request' : 'these ' + ids.length + ' requests') + '?');
-                                var test = /\d+/.exec(target);
-                                if(!test) return alert('Invalid room supplied, failing.');
-                                target = test[0];
-
-                                $.ajax({
-                                    data: 'ids=' + ids.join('%2C') + '&to=' + target + '&fkey=' + $('#fkey').val(),
-                                    type: 'POST',
-                                    url: '/admin/movePosts/' + room,
-                                    success: function() {
-                                        alert('I\'ve successfully moved ' + ids.length + ' question' + (ids.length === 1 ? '' : 's.'));
-                                    }
-                                });
-                            }
-                        });
-                    }, 4000);
-                }
-            });
-        }
-    })
+    init();
+    
+    function init() {
+        $.ajax({
+            type: 'POST',
+            url: '/user/info?ids=' + me + '&roomId=' + room,
+            success: getEvents
+        });
+    }
+    function getEvents(resp) {
+        if(!resp.users[0].is_owner && !resp.users[0].is_moderator) return alert('You\'re not a room owner here.');
+        $.ajax({
+            type: 'POST',
+            url: '/chats/' + room + '/events',
+            data: 'since=0&mode=Messages&msgCount=' + count + '&fkey=' + fkey,
+            success: handleEvents
+        });
+    }
+    function handleEvents(resp){
+        for(var i in resp.events) checkEvent(resp.events[i]);
+        checkRequests();
+    }
+    function checkEvent(event) {
+        post = /^.a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z).+http:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+)/.exec(event.content);
+        if(!post) return;
+        requests.push({ msg: event.message_id, post: post[1], closed: false });
+    }
+    function checkRequests() {
+        if(!requests.length) return alert('No requests found.');
+        num = requests.length - 1;
+        postchk = setInterval(getPopup, 4000);
+    }
+    function getPopup(){
+        if(num === 0) clearInterval(postchk);
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: 'http://stackoverflow.com/flags/questions/' + requests[num].post + '/close/popup',
+            onload: checkClosed
+        });
+    }
+    function checkClosed(resp) {
+        requests[num].closed = /This question is now closed/.test(resp.response);
+        console.log(requests[num]);
+        if(num-- === 0) movePosts();
+    }
+    function movePosts() {
+        formatIds();
+        $.ajax({
+            type: 'POST',
+            data: 'ids=' + ids + '&to=' + target + '&fkey=' + fkey,
+            url: '/admin/movePosts/' + room,
+            success: postsMoved
+        });
+    }
+    function formatIds() {
+        for(var i in requests) if(requests[i].closed) ids.push(requests[i].msg);
+        if(!ids.length) return alert('No closed requests.');
+        rnum = ids.length;
+        ids = ids.join('%2C');
+    }
+    function postsMoved() {
+        alert('I\'ve successfully moved ' + rnum + ' request' + (rnum === 1 ? '' : 's.'));
+    }
 }
