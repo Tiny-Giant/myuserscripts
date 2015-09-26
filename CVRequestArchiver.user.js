@@ -78,22 +78,22 @@ function CVRequestArchiver() {
     function checkClosed(resp) {
         requests[num].closed = /This question is now closed/.test(resp.response);
         console.log(requests[num]);
-        if(num-- === 0) movePosts();
-    }
-    function movePosts() {
-        formatIds();
-        $.ajax({
-            type: 'POST',
-            data: 'ids=' + ids + '&to=' + target + '&fkey=' + fkey,
-            url: '/admin/movePosts/' + room,
-            success: postsMoved
-        });
+        if(num-- === 0) formatIds();
     }
     function formatIds() {
         for(var i in requests) if(requests[i].closed) ids.push(requests[i].msg);
         if(!ids.length) return alert('No closed requests.');
         rnum = ids.length;
         ids = ids.join('%2C');
+        movePosts();
+    }
+    function movePosts() {
+        $.ajax({
+            type: 'POST',
+            data: 'ids=' + ids + '&to=' + target + '&fkey=' + fkey,
+            url: '/admin/movePosts/' + room,
+            success: postsMoved
+        });
     }
     function postsMoved() {
         alert('I\'ve successfully moved ' + rnum + ' request' + (rnum === 1 ? '' : 's.'));
