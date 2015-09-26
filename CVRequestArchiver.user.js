@@ -6,6 +6,7 @@
 // @author       @TinyGiant
 // @match        http://chat.stackoverflow.com/rooms/41570/*
 // @grant        GM_xmlhttpRequest
+// @run-at       context-menu
 // ==/UserScript==
 
 (function(){
