@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.2
+// @version      1.0.0.4
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant
 // @match        http://chat.stackoverflow.com/rooms/*
@@ -24,15 +24,15 @@ function CVRequestArchiver() {
     fkey = fkey.val();
 
     room = /chat.stackoverflow.com.rooms.(\d+)/.exec(window.location.href);
-    if(!room) return alert('We\'re not in a chat room...');
+    if(!room) return alert('But... we aren\'t in a chat room...');
     room = room[1];
 
     count = /\d+/.exec(prompt('How many messages should I scan?'));
-    if(!count) return alert('The string you entered doesn\'t contain a number.');
+    if(!count) return alert('Your response didn\'t contain a number, I\'m going back to sleep.');
     count = count[0];
 
     target = /\d+/.exec(prompt('Where should I send any requests I find?'));
-    if(!target) return alert('Invalid room supplied, failing.');
+    if(!target) return alert('Well that\'s not a valid room, I\'m going back to sleep.');
     target = target[0];
     
     init();
@@ -45,7 +45,7 @@ function CVRequestArchiver() {
         });
     }
     function getEvents(resp) {
-        if(!resp.users[0].is_owner && !resp.users[0].is_moderator) return alert('You\'re not a room owner here.');
+        if(!resp.users[0].is_owner && !resp.users[0].is_moderator) return alert('But... you\'re not a room owner here.');
         $.ajax({
             type: 'POST',
             url: '/chats/' + room + '/events',
@@ -63,7 +63,7 @@ function CVRequestArchiver() {
         requests.push({ msg: event.message_id, post: post[1], closed: false });
     }
     function checkRequests() {
-        if(!requests.length) return alert('No requests found.');
+        if(!requests.length) return alert('I couldn\'t find any requests.');
         num = requests.length - 1;
         postchk = setInterval(getPopup, 4000);
     }
@@ -78,16 +78,11 @@ function CVRequestArchiver() {
     function checkClosed(resp) {
         requests[num].closed = /This question is now closed/.test(resp.response);
         console.log(requests[num]);
-        if(num-- === 0) formatIds();
-    }
-    function formatIds() {
-        for(var i in requests) if(requests[i].closed) ids.push(requests[i].msg);
-        if(!ids.length) return alert('No closed requests.');
-        rnum = ids.length;
-        ids = ids.join('%2C');
-        movePosts();
+        if(num-- === 0) movePosts();
     }
     function movePosts() {
+        formatIds();
+        if(!confirm('I found ' + rnum + ' closed request' + (rnum === 1 ? '' : 's') + ', should I move them?')) return alert('Fine then, I\'m going back to sleep.');
         $.ajax({
             type: 'POST',
             data: 'ids=' + ids + '&to=' + target + '&fkey=' + fkey,
@@ -95,7 +90,13 @@ function CVRequestArchiver() {
             success: postsMoved
         });
     }
+    function formatIds() {
+        for(var i in requests) if(requests[i].closed) ids.push(requests[i].msg);
+        if(!ids.length) return alert('None of the requests I found were closed.');
+        rnum = ids.length;
+        ids = ids.join('%2C');
+    }
     function postsMoved() {
-        alert('I\'ve successfully moved ' + rnum + ' request' + (rnum === 1 ? '' : 's.'));
+        alert('I\'ve successfully moved ' + rnum + ' request' + (rnum === 1 ? '' : 's'));
     }
 }
