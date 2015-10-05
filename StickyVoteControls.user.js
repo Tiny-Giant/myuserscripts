@@ -19,9 +19,9 @@ votes.each(function(i,el){
     var postheight = el.parent().next().find('.post-text').height();
     if(el.height() >= postheight) return;
     var parent = el.parent();
-    var maxTop = parent.offset().top;
-    var maxBottom = maxTop + parent.height() - el.height();
     $(document).scroll(window.requestAnimationFrame.bind(null,function() {
+        var maxTop = parent.offset().top;
+        var maxBottom = maxTop + parent.height() - el.height();
         if(document.body.scrollTop > maxTop) document.body.scrollTop < maxBottom && el.css({'top':document.body.scrollTop}); else el.css({'top':''});
     }));
 })
