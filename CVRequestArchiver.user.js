@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.5
+// @version      1.0.0.6
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @match        *://chat.stackoverflow.com/rooms/*
@@ -11,7 +11,7 @@
 
 CVRequestArchiver();
 function CVRequestArchiver() {
-    var me, fkey, room, count, target, num, post, postchk, rnum, status, minId, maxloads = 20, pagesLoaded = 0, lid;
+    var me, fkey, room, count, target, num, post, postchk, rnum, status, minId, maxloads = 200, pagesLoaded = 0, lid;
     var requests = [];
     var ids = [];
     
@@ -38,6 +38,7 @@ function CVRequestArchiver() {
     init();
     
     function init() {
+        debugger;
         status = $('#chat-buttons div');
         if (status.length === 0) {
            status = $('<div></div>');
@@ -94,11 +95,11 @@ function CVRequestArchiver() {
         console.log('lowest message_id: ' + lid);
         if(!requests.length) return alert('I couldn\'t find any requests.');
         num = requests.length - 1;
-        status.text('check requests ' + num);
         postchk = setInterval(getPopup, 4000);
     }
     function getPopup(){
         if(num === 0) clearInterval(postchk);
+        status.text('check requests ' + num);
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'http://stackoverflow.com/flags/questions/' + requests[num].post + '/close/popup',
@@ -118,8 +119,23 @@ function CVRequestArchiver() {
         console.log(target);
         movePostsBatch();
     }
+    function shiftSlice(arr, l) {
+        var ret = [],
+            i;
+        for(; l > 0; l--) {
+            i = arr.shift();
+            if (i !== undefined) {
+	            ret.push(i);
+            } else {
+                break;
+            }
+        }
+        return { left: arr, curr: ret};
+    }
     function movePostsBatch() {
-        var bids = ids.slice(0,100);
+        var rest = shiftSlice(ids, 100),
+            bids = rest.curr;
+        ids = rest.left;
         if(bids.length > 0) {
             rnum = bids.length;
             status.text('moving ' + bids.length + ', remaining ' + ids.length);
