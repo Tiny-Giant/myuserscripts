@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.6
+// @version      1.0.0.7
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @match        *://chat.stackoverflow.com/rooms/*
@@ -31,14 +31,11 @@ function CVRequestArchiver() {
     if(!count) return alert('Your response didn\'t contain a number, I\'m going back to sleep.');
     count = count[0];
 
-    target = /\d+/.exec(prompt('Where should I send any requests I find?'));
-    if(!target) return alert('Well that\'s not a valid room, I\'m going back to sleep.');
-    target = target[0];
+    target = 90230;
     
     init();
     
     function init() {
-        debugger;
         status = $('#chat-buttons div');
         if (status.length === 0) {
            status = $('<div></div>');
@@ -107,9 +104,21 @@ function CVRequestArchiver() {
         });
     }
     function checkClosed(resp) {
-        requests[num].closed = /This question is now closed/.test(resp.response);
-        console.log(requests[num]);
-        if(num-- === 0) movePosts();
+        var closed = /This question is now closed/.test(resp.response);
+        if(!closed) GM_xmlhttpRequest({
+            method: 'GET',
+            url: 'http://stackoverflow.com/q/' + requests[num].post,
+            onload: function(resp) {
+                requests[num].closed = /Page Not Found/.test(resp.response);
+                console.log(requests[num]);
+                if(num-- === 0) movePosts();
+            }
+        });
+        else {
+            requests[num].closed = closed;
+            console.log(requests[num]);
+            if(num-- === 0) movePosts();
+        }
     }
     function movePosts() {
         clearInterval(postchk);
