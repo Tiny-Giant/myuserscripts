@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.7
+// @version      1.0.0.8
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @match        *://chat.stackoverflow.com/rooms/*
@@ -51,52 +51,51 @@ function CVRequestArchiver() {
     function getInitialEvents(resp) {
         if(!resp.users[0].is_owner && !resp.users[0].is_moderator) return alert('But... you\'re not a room owner here.');
         status.text('Initial events');
-        getEvents(0);
+        getEvents(count, handleEvents);
     }
-    function getEvents(since, before) {
-        var postdata = {
-            fkey: fkey,
-            msgCount: count,
-            mode: 'Messages',
+    var getEvents = (function() {
+        var events = [];
+        status.text('Fetching events');
+        return function get(count, callback, before) {
+            if (count <= 0) return callback(events), false;
+            var data = {
+                fkey: fkey,
+                msgCount: count > 500 ? 500 : count,
+                mode: 'Messages',
+            };
+            if (before) data.before = before;
+            $.ajax({
+                type: 'POST',
+                url: '/chats/' + room + '/events',
+                data: data,
+                success: function(response) {
+                    events.push(response.events);
+                    get(count - 500, callback, response.events[0].message_id);
+                },
+                error: function() {
+                    brk = alert('Scanning messages failed. I don\'t know what would cause this yet.'), true;
+                }
+            });
         };
-        if (before !== undefined) {
-            postdata.before = before;
-        } else {
-            postdata.since = since;
-        }
-        $.ajax({
-            type: 'POST',
-            url: '/chats/' + room + '/events',
-            data: postdata,
-            success: handleEvents
-        });
-        pagesLoaded++;
-    }
-    function handleEvents(resp){
-        for(var i in resp.events) checkEvent(resp.events[i]);
-        var numcount = parseInt(count, 10);
-        if (resp.events !== undefined && resp.events.length === numcount && pagesLoaded < maxloads) {
-            setTimeout(function() { status.text('next events ' + resp.events[0].message_id); getEvents(0, resp.events[0].message_id ) }  , 5000);
-        } else {
-            checkRequests();
-        }
+    })();
+    function handleEvents(events){
+        for(var i in events) for(var j in events[i]) checkEvent(events[i][j]);
+        checkRequests();
     }
     function checkEvent(event) {
-        post = /^.a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z).+http:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+)/.exec(event.content);
-        if(!post) return;
-        if (lid === undefined) lid = event.message_id;
-        lid = event.message_id < lid ? event.message_id : lid;
-        requests.push({ msg: event.message_id, post: post[1], closed: false });
+        post = (/.a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z).+https?:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+)/.exec(event.content)||[false,false])[1];
+        if (!post) post = (/https?:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+).+a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z)/.exec(event.content)||[false,false])[1];
+        if (!post) return;
+        requests.push({ msg: event.message_id, post: post, closed: false });
     }
     function checkRequests() {
-        console.log('lowest message_id: ' + lid);
-        if(!requests.length) return alert('I couldn\'t find any requests.');
+        if (!requests.length) return alert('I couldn\'t find any requests.');
         num = requests.length - 1;
         postchk = setInterval(getPopup, 4000);
     }
     function getPopup(){
         if(num === 0) clearInterval(postchk);
-        status.text('check requests ' + num);
+        status.text('Checking requests: ' + num);
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'http://stackoverflow.com/flags/questions/' + requests[num].post + '/close/popup',
