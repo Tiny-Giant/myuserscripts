@@ -8,6 +8,12 @@
 // @grant          none
 // ==/UserScript==
 
+/*********************************************************
+ * This is an experiment to show that it is possible.    *
+ * This is not intended to actually be used              *
+ * If you get caught using this you may be review banned *
+ *********************************************************/
+
 (function(){
     var headerWidth = $('#header').width();
     var logoWidth = $('#hlogo').width();
