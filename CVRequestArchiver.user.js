@@ -108,7 +108,10 @@ function CVRequestArchiver() {
             method: 'GET',
             url: 'http://stackoverflow.com/q/' + requests[num].post,
             onload: function(resp) {
-                requests[num].closed = /Page Not Found/.test(resp.response);
+                debugger;
+                var under10k = /Page Not Found/.test(resp.response),
+                    over10K = /<div class="question deleted-answer"/.test(resp.response);
+                requests[num].closed = under10k || over10K;
                 console.log(requests[num]);
                 if(num-- === 0) movePosts();
             }
