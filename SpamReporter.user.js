@@ -33,7 +33,7 @@
         
         var room = 41570; // use 68414 for testing
         
-        var post = /\d+/.exec(scope.querySelector('.short-link').id)[0];
+        var postLink = scope.querySelector('.short-link').href;
         
         var reportSent = function(response) {
             console.log(response);
@@ -61,7 +61,7 @@
                 return false;
             }
             
-            var reportStr = '!!/report http://stackoverflow.com/posts/' + post; 
+            var reportStr = '!!/report ' + postLink;
             
             var options = {
                 method: 'POST',
