@@ -174,7 +174,6 @@ var retrieve = function(){
             'order=asc',
             'sort=votes',
             'site=stackoverflow',
-            'key=dwtLmAaEXumZlC5Nj0vDuw((',
             'filter=!*1SgQGDMkNp5Q5J5xfAEVlw9LQcyFwWIE8EnwCpEY'
         ];
 
