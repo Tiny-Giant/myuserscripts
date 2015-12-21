@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      2.0.0.0
+// @version      2.0.0.1
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @include      /https?:\/\/chat(\.meta)?\.stack(overflow|exchange).com\/rooms\/.*/
@@ -35,6 +35,7 @@ function CVRequestArchiver(info){
     var requests = [];
     var closed = [];
     var events = [];
+    var ids = [];
     
     var target = 90230;
     var nodes = {};
@@ -163,13 +164,9 @@ function CVRequestArchiver(info){
         '    width: 0%;',
         '    background: #ff7b18;',
         '    height: 100%;',
-        '    transition: width 1s linear;',
         '}'
     ].join('\n');
     nodes.scope.appendChild(nodes.style);
-
-    var scanning = false;
-    var stop = false;
 
     nodes.startbtn.addEventListener('click', function(){
         nodes.startbtn.disabled = true;
@@ -183,6 +180,7 @@ function CVRequestArchiver(info){
 
     nodes.form.addEventListener('submit', function(e){
         e.preventDefault();
+        nodes.cancel.disabled = true;
         total = count = +nodes.count.value;
         nodes.count.disabled = true;
         nodes.gobtn.disabled = true;
@@ -195,6 +193,7 @@ function CVRequestArchiver(info){
     nodes.movebtn.addEventListener('click', movePosts, false);
 
     function reset() {
+        if(this.disabled) return false;
         rlen = 0;
         rnum = 0;
         total = 0;
@@ -203,6 +202,7 @@ function CVRequestArchiver(info){
         requests = [];
         closed = [];
         events = [];
+        ids = [];
         nodes.count.style.display = 'none';
         nodes.count.value = '';
         nodes.count.disabled = false;
@@ -221,7 +221,7 @@ function CVRequestArchiver(info){
         nodes.indicator.value = 'getting events... (' + (total - count) + ' / ' + total + ')';
         nodes.progress.style.width = Math.ceil(((total - count) * 100) / total) + '%';
         if (count <= 0) {
-            handleEvents(events);
+            scanEvents(events);
             return false;
         }
         var data = {
@@ -239,7 +239,7 @@ function CVRequestArchiver(info){
 
                 if(!response.events[0]) {
                     console.log(response);
-                    handleEvents();
+                    scanEvents();
                     return false;
                 }
 
@@ -248,27 +248,27 @@ function CVRequestArchiver(info){
         });
     };
 
-    function handleEvents(){
-        nodes.progress.style.transition = 'unset';
+    function scanEvents(){
         nodes.progress.style.width = '';
-        nodes.progress.style.transition = '';
         for(var i in events) for(var j in events[i]) checkEvent(events[i][j], i, events.length);
-        nodes.progress.style.transition = 'unset';
         nodes.progress.style.width = '';
-        nodes.progress.style.transition = '';
 
         if(!requests.length) {
-            nodes.indicator.value = 'no requests found'
+            nodes.indicator.value = 'no requests found';
+            nodes.progresswrp.style.display = 'none';
+            nodes.progress.style.width = '';
+            nodes.cancel.disabled = false;
             return false;
         }
 
         nodes.indicator.value = 'chunking request array...';
 
-        splitRequests();
-
+        rlen = requests.length;
+        requests = chunkArray(requests, 100);
+        
         checkRequests();
     }
-
+    
     function checkEvent(event, current, total) {
         nodes.indicator.value = 'checking events... (' + current + ' / ' + total + ')';
         nodes.progress.style.width = Math.ceil((current * 100) / total) + '%';
@@ -278,27 +278,12 @@ function CVRequestArchiver(info){
         requests.push({ msg: event.message_id, post: post });
     }
 
-    function splitRequests() {
-        var tmp = [];
-        var num = Math.ceil(requests.length / 100);
-        for(var i = 0; i < num; ++i) {
-            tmp.push([]);
-        }
-        var ind = 0;
-        for(var j in requests) {
-            if(j > 0 && !(j % 100)) ++ind;
-            tmp[ind].push(requests[j]);
-        }
-        rlen = requests.length;
-        requests = tmp;
-    }
-
     function checkRequests() {
         var currentreq = requests.pop();
 
         var left = [rlen,rlen - (requests.length * 100)][+(rlen > 100)];
 
-        nodes.indicator.value = 'checking requests... (' + left + ' / ' + rlen + ')';
+        nodes.indicator.value = 'checking requests... (' + left + ' / ' + rlen + ')'; 
         nodes.progress.style.width = Math.ceil((left * 100) / rlen) + '%';
 
         var xhr = new XMLHttpRequest();
@@ -344,74 +329,74 @@ function CVRequestArchiver(info){
     }
 
     function checkDone() {
-        if(!closed.length) {
+        rnum = closed.length;
+        
+        if(!rnum) {
             nodes.indicator.value = 'no closed requests found';
+            nodes.progresswrp.style.display = 'none';
+            nodes.progress.style.width = '';
+            nodes.cancel.disabled = false;
             return false;
         }
+        
+        ids = chunkArray(formatMsgs(closed), 100);
 
         nodes.indicator.value = closed.length + ' closed request' + ['','s'][+(closed.length > 1)] + ' found';
         nodes.movebtn.style.display = '';
+        nodes.cancel.disabled = false;
         nodes.progresswrp.style.display = 'none';
-        nodes.progress.style.transition = 'unset';
         nodes.progress.style.width = '';
-        nodes.progress.style.transition = '';
+    }
+    
+    function movePosts() {
+        var currentids = ids.pop();
+
+        var left = [rnum,rnum - (ids.length * 100)][+(rnum > 100)];
+
+        nodes.indicator.value = 'moving requests... (' + left + ' / ' + rnum + ')';
+        nodes.progress.style.width = Math.ceil((left * 100) / rnum) + '%';
+        
+        $.ajax({
+            type: 'POST',
+            data: 'ids=' + currentids.join('%2C') + '&to=' + target + '&fkey=' + fkey,
+            url: '/admin/movePosts/' + room,
+            success: function(){
+                if(!ids.length) {
+                    nodes.progresswrp.style.display = 'none';
+                    nodes.progress.style.width = '';
+                    nodes.indicator.value = 'done';
+                    nodes.movebtn.style.display = 'none';
+                    return false;
+                }
+                    
+                setTimeout.bind(null, movePosts, 5000);
+            }
+        }); 
     }
 
     function formatPosts(arr) {
-        var ids = [];
-        for(var i in arr) ids.push(arr[i].post);
-        return ids.join(';');
+        var tmp = [];
+        for(var i in arr) tmp.push(arr[i].post);
+        return tmp.join(';');
     }
 
     function formatMsgs(arr) {
-        var ids = [];
-        for(var i in arr) ids.push(arr[i].msg);
-        rnum = ids.length;
-        return ids;
+        var tmp = [];
+        for(var i in arr) tmp.push(arr[i].msg);
+        return tmp;
     }
-
-    function shiftSlice(arr, l) {
-        var ret = [],
-            i;
-        for(; l > 0; l--) {
-            i = arr.shift();
-            if (i !== undefined) {
-                ret.push(i);
-            } else {
-                break;
-            }
+    
+    function chunkArray(arr, len) {
+        var tmp = [];
+        var num = Math.ceil(arr.length / len);
+        for(var i = 0; i < num; ++i) {
+            tmp.push([]);
         }
-        return { left: arr, curr: ret};
-    }
-
-    function movePosts() {
-        var ids = formatMsgs(closed);
-
-        if(rnum === 0) {
-            nodes.indicator.value = 'no closed requests found';
-            return false;
+        var ind = 0;
+        for(var j in arr) {
+            if(j > 0 && !(j % len)) ++ind;
+            tmp[ind].push(arr[j]);
         }
-
-        var rest = shiftSlice(ids, 100),
-            bids = rest.curr;
-        ids = rest.left;
-        if(bids.length > 0) {
-            rnum = bids.length;
-            nodes.indicator.value = 'moving ' + bids.length + ' / ' + ids.length;
-            nodes.progress.style.width = Math.ceil((bids.length * ids.length) / 100) + '%';
-            $.ajax({
-                type: 'POST',
-                data: 'ids=' + bids.join('%2C') + '&to=' + target + '&fkey=' + fkey,
-                url: '/admin/movePosts/' + room,
-                success: setTimeout.bind(null, movePosts, 5000)
-            }); 
-        } else {
-            nodes.progresswrp.style.display = 'none';
-            nodes.progress.style.transition = 'unset';
-            nodes.progress.style.width = '';
-            nodes.progress.style.transition = '';
-            nodes.indicator.value = 'done';
-            nodes.movebtn.display = 'none';
-        }
+        return tmp;
     }
 }
