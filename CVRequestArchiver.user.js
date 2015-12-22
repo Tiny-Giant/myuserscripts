@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      2.0.0.1
+// @version      2.0.0.2
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @include      /https?:\/\/chat(\.meta)?\.stack(overflow|exchange).com\/rooms\/.*/
@@ -79,7 +79,7 @@ function CVRequestArchiver(info){
     nodes.indicator = document.createElement('input');
     nodes.indicator.className = 'button archiver-indicator';
     nodes.indicator.type = 'text';
-    nodes.indicator.readonly = true;
+    nodes.indicator.readOnly = true;
     nodes.indicator.style.display = 'none';
     nodes.scope.appendChild(nodes.indicator);
 
@@ -149,6 +149,7 @@ function CVRequestArchiver(info){
         '    cursor: default;',
         '}',
         '.archiver-indicator {',
+        '    border: 0px;',
         '    width: 162px;',
         '}',
         '.archiver-form {',
@@ -237,8 +238,8 @@ function CVRequestArchiver(info){
             success: function(response) {
                 events.push(response.events);
 
+                // no more events in the transcript
                 if(!response.events[0]) {
-                    console.log(response);
                     scanEvents();
                     return false;
                 }
@@ -269,13 +270,31 @@ function CVRequestArchiver(info){
         checkRequests();
     }
     
+    var regexes = [
+        /(?:tagged\/cv-pl(?:ease|s|z)|\[cv-pl(?:ease|s|z)\]).*(?:q[^\/]*|posts)\/(\d+)/,
+        /(?:q[^\/]*|posts)\/(\d+).*(?:tagged\/cv-pl(?:ease|s|z)|\[cv-pl(?:ease|s|z)\])/,
+    ];
+    
     function checkEvent(event, current, total) {
         nodes.indicator.value = 'checking events... (' + current + ' / ' + total + ')';
         nodes.progress.style.width = Math.ceil((current * 100) / total) + '%';
-        var post = (/.a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z).+https?:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+)/.exec(event.content)||[false,false])[1];
-        if (!post) post = (/https?:..stackoverflow.com.(?:q[^\/]*|posts)\/(\d+).+a href="(?:https?:)?..stackoverflow.com.questions.tagged.cv-pl(?:ease|s|z)/.exec(event.content)||[false,false])[1];
-        if (!post) return;
-        requests.push({ msg: event.message_id, post: post });
+        var message = event.content;
+        var isreq = false;
+        for(var j in regexes) {
+            if(regexes[j].test(message)) {
+                isreq = true;
+                break;
+            }
+        }
+        if (!isreq) return false;
+        var matches = /http.*?(?:q[^\/]*|posts)\/(\d+)/g.exec(message);
+        matches.shift();
+        var posts = [];
+        for(var k in Object.keys(matches)) {
+            if(!matches[k]) continue;
+            posts.push(matches[k]);
+        }
+        for(var l in posts) requests.push({ msg: event.message_id, post: posts[l], time: event.time_stamp });
     }
 
     function checkRequests() {
@@ -301,6 +320,7 @@ function CVRequestArchiver(info){
             for(var i in items) {
                 if(!items[i].closed_date) {
                     for(var j in currentreq) {
+                        if(items[i].close_vote_count == 0 && ((Date.now() - (currentreq[j].time * 1000)) > (1000 * 60 * 60 * 24 * 3))) continue;
                         if(currentreq[j].post == items[i].question_id) delete currentreq[j];
                     }
                 }
@@ -320,7 +340,7 @@ function CVRequestArchiver(info){
             'pagesize=100',
             'site=stackoverflow',
             'key=qhq7Mdy8)4lSXLCjrzQFaQ((',
-            'filter=!-MOiNm40DvA6mK_CVSV2rixF80rE7Pnkz'
+            'filter=!gB66oJbwf2oAg19qt9k287Kesk6)y5u4M_f'
         ].join('&');
 
         xhr.open("GET", url);
@@ -369,7 +389,7 @@ function CVRequestArchiver(info){
                     return false;
                 }
                     
-                setTimeout.bind(null, movePosts, 5000);
+                setTimeout(movePosts, 5000);
             }
         }); 
     }
