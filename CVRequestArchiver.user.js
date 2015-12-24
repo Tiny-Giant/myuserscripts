@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CV Request Archiver
 // @namespace    https://github.com/Tiny-Giant/
-// @version      2.0.0.2
+// @version      2.0.0.3
 // @description  Scans the chat transcript and checks all cv requests for status, then moves the closed ones.
 // @author       @TinyGiant @rene
 // @include      /https?:\/\/chat(\.meta)?\.stack(overflow|exchange).com\/rooms\/.*/
@@ -287,12 +287,10 @@ function CVRequestArchiver(info){
             }
         }
         if (!isreq) return false;
-        var matches = /http.*?(?:q[^\/]*|posts)\/(\d+)/g.exec(message);
-        matches.shift();
+        var matches = message.match(/http.*?(?:q[^\/]*|posts)\/(\d+)/g);
         var posts = [];
         for(var k in Object.keys(matches)) {
-            if(!matches[k]) continue;
-            posts.push(matches[k]);
+            posts.push(/(?:q[^\/]*|posts)\/(\d+)/.exec(matches[k])[1]);
         }
         for(var l in posts) requests.push({ msg: event.message_id, post: posts[l], time: event.time_stamp });
     }
