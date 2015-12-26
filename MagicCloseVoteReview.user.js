@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Close Votes - Magic™ Edition
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Creates a fake queue which allows you to search by tag and close votes.
 // @author       @TinyGiant
 // @match        http://stackoverflow.com/review/custom*
@@ -11,11 +11,12 @@
 'use strict';
 
 var queue   = JSON.parse(["[]",localStorage.SECUSTOMREVIEW_queue][+!!localStorage.SECUSTOMREVIEW_queue]), 
-    current = [0, +localStorage.SECUSTOMREVIEW_current][+!!localStorage.SECUSTOMREVIEW_current],
+    current = [-1,+localStorage.SECUSTOMREVIEW_current][+!!localStorage.SECUSTOMREVIEW_current],
     total   = [0, +localStorage.SECUSTOMREVIEW_total][+!!localStorage.SECUSTOMREVIEW_total],
     tag     = ['', localStorage.SECUSTOMREVIEW_tag][+!!localStorage.SECUSTOMREVIEW_tag],
     pages   = ['', localStorage.SECUSTOMREVIEW_pages][+!!localStorage.SECUSTOMREVIEW_pages],
-    minimum = ['',+localStorage.SECUSTOMREVIEW_minimum][+!!localStorage.SECUSTOMREVIEW_minimum];
+    minimum = ['',+localStorage.SECUSTOMREVIEW_minimum][+!!localStorage.SECUSTOMREVIEW_minimum],
+    prevlen = [0, +localStorage.SECUSTOMREVIEW_prevlen][+!!localStorage.SECUSTOMREVIEW_prevlen];
 
 var previousLength = queue.length, justloaded = true;
 
@@ -125,7 +126,7 @@ nodes.scope.appendChild(nodes.question);
 var reset = function(){
     justloaded = true;
     localStorage.SECUSTOMREVIEW_queue = JSON.stringify(queue = []);
-    localStorage.SECUSTOMREVIEW_current = current = 0;
+    localStorage.SECUSTOMREVIEW_current = current = -1;
     localStorage.SECUSTOMREVIEW_total = total = 0;
     localStorage.SECUSTOMREVIEW_pages = nodes.pages.value;
     localStorage.SECUSTOMREVIEW_tag = tag = nodes.tagged.value;
@@ -174,11 +175,12 @@ var retrieve = function(){
             'order=asc',
             'sort=votes',
             'site=stackoverflow',
+            'key=dwtLmAaEXumZlC5Nj0vDuw((',
             'filter=!*1SgQGDMkNp5Q5J5xfAEVlw9LQcyFwWIE8EnwCpEY'
         ];
 
         if(tagged) {
-            options.unshift('tagged=' + tagged);
+            options.unshift('tagged=' + encodeURIComponent(tagged));
         }
 
         url += options.join('&');
@@ -191,8 +193,6 @@ var retrieve = function(){
 
 var display = function(post) {
     if (!post) return false;
-    
-    previousLength = queue.length;
     
     localStorage.SECUSTOMREVIEW_current = current;
     
@@ -247,6 +247,8 @@ nodes.form.addEventListener('submit', function(e){
     if(tag !== nodes.tagged.value || minimum !== +nodes.minimum.value) reset();
     
     retrieve()(pages, tag, function(items){ 
+        localStorage.SECUSTOMREVIEW_prevlen = prevlen = queue.length;
+        
         for(var i in items) {
             var item = items[i];
 
@@ -264,12 +266,9 @@ nodes.form.addEventListener('submit', function(e){
         nodes.indicator.style.display = ['none',''][+(queue.length > 1)];
         nodes.indicator.textContent   = (current + 1) + ' / ' + queue.length;
         
-        if(queue.length === previousLength) return false;
+        if(queue.length === prevlen) return false;
 
-        if(justloaded) {
-            justloaded = false;
-            display(queue[0]);
-        }
+        display(queue[prevlen]);
     });
 }, false);
 
