@@ -76,8 +76,8 @@
         
         
         var report = function(e) {
-			e.preventDefault();
-			
+            e.preventDefault();
+
             if(!confirm('Do you really want to report this post?')) {
                 return false;
             }
