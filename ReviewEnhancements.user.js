@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  The review queues are abstractions with some limitations. This script removes those limitations on questions
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.|www\.)?stackoverflow.com\/review\/(?!custom).*
@@ -46,7 +46,7 @@ let getPost = (post) => {
             return;
         }
         
-        post.innerHTML = xhr.responseText;
+        post.outerHTML = xhr.responseText;
         
         if (/question/.test(post.className)) initQuestion(post);
     }, false);
