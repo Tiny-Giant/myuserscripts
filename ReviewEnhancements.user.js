@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.1
+// @version      1.0.0.2
 // @description  The review queues are abstractions with some limitations. This script removes those limitations on questions
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.|www\.)?stackoverflow.com\/review\/(?!custom).*
@@ -59,9 +59,19 @@ let getPost = (post) => {
 $(document).ajaxComplete((one, two, three) => { 
     if(!/next\-task|task\-reviewed/.test(three.url)) return;
     
+    let task = JSON.parse(two.responseText);
+    
+    console.log('TASK', task);
+    
+    if(!task || task.isAudit) return;
+    
+    let question = document.querySelector('.question');
+    
+    if (!question) return;
+    
     let answers  = document.querySelectorAll('.answer');
     
     for(let i in Object.keys(answers)) getPost(answers[i]);
     
-    getPost(document.querySelector('.question'));
+    getPost(question);
 });
