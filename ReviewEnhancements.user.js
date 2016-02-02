@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.3
+// @version      1.0.0.4
 // @description  The review queues are abstractions with some limitations. This script removes those limitations on questions
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.|www\.)?stackoverflow.com\/review\/(?!custom).*
@@ -58,7 +58,7 @@ let fetchPost = () => {
         
         let osnippets = post.querySelectorAll('.snippet');
 
-        parent.innerHTML = xhr.responseText;
+        post.outerHTML = xhr.responseText;
 
         post = parent.querySelector('.question, .answer');
         
