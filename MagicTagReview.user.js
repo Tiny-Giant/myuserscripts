@@ -1,16 +1,21 @@
 // ==UserScript==
 // @name         Magic™ Tag Review
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.1
+// @version      1.0.0.2
 // @description  Creates a fake queue which allows you to search a tag by a minimum number close votes or delete votes.
 // @author       @TinyGiant
 // @match        http://stackoverflow.com/review/custom*
 // @match        http://stackoverflow.com/review
 // @grant        none
+// @run-at       document-idle
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esversion: 6 */
 'use strict';
+
+StackExchange.using("inlineEditing", function () {
+    StackExchange.inlineEditing.init();
+});
 
 if(!/custom/.test(window.location.href)) {
     let nodes = {};
@@ -155,6 +160,7 @@ else {
     nodes.header.appendChild(nodes.h1);
 
     nodes.title = document.createElement('a');
+    nodes.title.target = '_blank';
     nodes.h1.appendChild(nodes.title);
 
     nodes.question = document.createElement('div');
@@ -182,14 +188,14 @@ else {
 
         xhr.addEventListener("load", event => {
             if(xhr.status !== 200) {
-                console.log(xhr.responseText, xhr.status, xhr.statusText);
+                console.dir(xhr.responseText, xhr.status, xhr.statusText);
 
                 return false;
             }
 
             let response = JSON.parse(xhr.responseText);
 
-            console.log(response);
+            console.dir(response);
 
             callback(response.items);
 
@@ -230,46 +236,47 @@ else {
     display = current => {
         localStorage.SECUSTOMREVIEW_current = current;
 
-        let question = Object.keys(queue)[current];
+        let post = Object.keys(queue)[current];
 
-        if(!question) return false;
+        if(!post) return false;
 
         let xhr = new XMLHttpRequest();
 
         xhr.addEventListener('load', event => {
+            updatestats();
             nodes.question.innerHTML = xhr.responseText;
 
-            var item = queue[question];
+            let item = queue[post];
 
-            nodes.title.href = 'http://stackoverflow.com/q/' + question;
+            nodes.title.href = 'http://stackoverflow.com/q/' + post;
             nodes.title.innerHTML = [item.title, ['open','closed'][+!!item.closed_date], item.close_vote_count, item.delete_vote_count ].join(' - ');
+            
             StackExchange.question.init({
                 votesCast: [],
                 canViewVoteCounts: true,
-                questionId: question
+                questionId: post
             });
 
             nodes.question.querySelector('.js-show-link.comments-link').click();
-
-            updatestats();
 
             if(document.querySelector('a[title^="You voted to close"]')) {
                 nodes.title.textContent += ' - Voted';
             }
 
             if(xhr.status !== 200) {
-                console.log(xhr.status, xhr.statusText);
+                console.dir(xhr.status, xhr.statusText);
 
                 return false;
             }
         }, false);
 
-        xhr.open('GET', '/posts/ajax-load-realtime/' + question);
+        xhr.open('GET', '/posts/ajax-load-realtime/' + post);
 
         xhr.send();
     };
 
     updatestats = () => {
+        console.log('update stats');
         nodes.previous.style.display  = ['none',''][+(current > 0)];
         nodes.next.style.display      = ['none',''][+(current < Object.keys(queue).length - 1)];
         nodes.indicator.style.display = ['none',''][+(Object.keys(queue).length > 1)];
@@ -325,5 +332,12 @@ else {
         });
     }, false);
 
-    if(Object.keys(queue).length) display(current);   
+    if(Object.keys(queue).length) {
+        let interval = setInterval(() => {
+            if(StackExchange.question) {
+                clearInterval(interval);
+                display(current);
+            }
+        }, 100);
+    }
 }
