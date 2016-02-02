@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Trainwreck
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Posts a link to a random trainwreck image with the text "#RekdTrain"
 // @author       @TinyGiant
-// @match        http://chat.stackoverflow.com/rooms/*
+// @include      /https?:\/\/chat.stackoverflow.com\/rooms\/.*/
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 /* jshint -W097 */
