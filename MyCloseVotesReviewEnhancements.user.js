@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         My Close Votes Review Enhancements
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Loads posts in their natural form on the close votes page for users.
 // @author       @Tiny-Giant
 // @include      /https?:\/\/(meta\.|www\.)?stackoverflow\.com/users/\d+/.*?(\?tab=votes.*?\&sort=closure|\&sort=closure.*?\?tab=votes).*/
@@ -19,7 +19,7 @@ StackExchange.using("inlineEditing", function () {
 });
 
 let initQuestion = post => {
-    post.setAttribute('style', 'width: 680px !important');
+    post.setAttribute('style', 'width: 730px !important');
     
     post.querySelector('.votecell').style.verticalAlign = 'top';
     
