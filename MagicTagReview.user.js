@@ -90,7 +90,10 @@ else {
         '    padding: 5px 7.5px;',
         '}',
         '.question-status {',
-        '   width: 660px',
+        '    width: 660px',
+        '}',
+        'h1, h2, h3, h4, h5, h6 {',
+        '    font-weight: normal;',
         '}'
     ].join('\n');
     nodes.scope.appendChild(nodes.style);
@@ -157,7 +160,6 @@ else {
     nodes.scope.appendChild(nodes.header);
 
     nodes.h1 = document.createElement('h1');
-    nodes.h1.style.fontWeight = 'normal';
     nodes.header.appendChild(nodes.h1);
 
     nodes.title = document.createElement('a');
