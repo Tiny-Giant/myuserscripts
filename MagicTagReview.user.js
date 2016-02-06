@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.2
+// @version      1.0.0.3
 // @description  Creates a fake queue which allows you to search a tag by a minimum number close votes or delete votes.
 // @author       @TinyGiant
 // @match        http://stackoverflow.com/review/custom*
@@ -60,7 +60,7 @@ else {
         tag         =            ['',  localStorage.SECUSTOMREVIEW_tag]        [+!!localStorage.SECUSTOMREVIEW_tag],
         closevotes  =            ['', +localStorage.SECUSTOMREVIEW_closevotes] [+!!localStorage.SECUSTOMREVIEW_closevotes],
         deletevotes =            ['', +localStorage.SECUSTOMREVIEW_deletevotes][+!!localStorage.SECUSTOMREVIEW_deletevotes],
-        reset, retrieve, display, updatestats, logqueue;
+        reset, retrieve, getVotes, display, updatestats, logqueue;
 
     document.querySelector('title').textContent = 'Review Close Votes - Magic™ Edition';
 
@@ -157,6 +157,7 @@ else {
     nodes.scope.appendChild(nodes.header);
 
     nodes.h1 = document.createElement('h1');
+    nodes.h1.style.fontWeight = 'normal';
     nodes.header.appendChild(nodes.h1);
 
     nodes.title = document.createElement('a');
@@ -232,6 +233,23 @@ else {
 
         xhr.send();
     };
+    
+    getVotes = (post, callback) => {
+        let xhr = new XMLHttpRequest();
+        
+        xhr.addEventListener('load', event => {
+            if(xhr.status !== 200) {
+                console.log(xhr.status, xhr.statusText, xhr.responseText);
+                return;
+            }
+            
+            callback(JSON.parse(xhr.responseText));
+        }, false);
+
+        xhr.open('GET', '/posts/' + post + '/votes');
+
+        xhr.send();
+    };
 
     display = current => {
         localStorage.SECUSTOMREVIEW_current = current;
@@ -242,32 +260,31 @@ else {
 
         let xhr = new XMLHttpRequest();
 
-        xhr.addEventListener('load', event => {
-            updatestats();
-            nodes.question.innerHTML = xhr.responseText;
-
-            let item = queue[post];
-
-            nodes.title.href = 'http://stackoverflow.com/q/' + post;
-            nodes.title.innerHTML = [item.title, ['open','closed'][+!!item.closed_date], item.close_vote_count, item.delete_vote_count ].join(' - ');
+        xhr.addEventListener('load', event => {            
+            if(xhr.status !== 200) console.log(xhr.status, xhr.statusText);
             
-            StackExchange.question.init({
-                votesCast: [],
-                canViewVoteCounts: true,
-                questionId: post
+            updatestats();
+            
+            getVotes(post, votes => {
+                nodes.question.innerHTML = xhr.responseText;
+
+                StackExchange.question.init({
+                    votesCast: votes,
+                    canViewVoteCounts: true,
+                    questionId: post
+                });
+
+                (document.querySelector('.js-show-link.comments-link')||{click:()=>{}}).click();
+
+                let item = queue[post];
+
+                nodes.title.href = 'http://stackoverflow.com/q/' + post;
+                nodes.title.innerHTML = [item.title, ['open','closed'][+!!item.closed_date], item.close_vote_count, item.delete_vote_count ].join(' - ');
+
+                if(document.querySelector('a[title^="You voted to close"]')) {
+                    nodes.title.textContent += ' - Voted';
+                }
             });
-
-            nodes.question.querySelector('.js-show-link.comments-link').click();
-
-            if(document.querySelector('a[title^="You voted to close"]')) {
-                nodes.title.textContent += ' - Voted';
-            }
-
-            if(xhr.status !== 200) {
-                console.dir(xhr.status, xhr.statusText);
-
-                return false;
-            }
         }, false);
 
         xhr.open('GET', '/posts/ajax-load-realtime/' + post);
