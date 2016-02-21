@@ -7,6 +7,8 @@
 // @include        /^https?://\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/review/.*/
 // @grant          none
 // ==/UserScript==
+/* jshint -W097 */
+'use strict';
 
 /*********************************************************
  * This is an experiment to show that it is possible.    *
