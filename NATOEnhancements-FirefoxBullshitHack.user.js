@@ -11,7 +11,7 @@
 /* jshint esversion: 6 */
 'use strict';
 
-let FireFoxBullshitHack = function(){
+let FirefoxBullshitHack = function(){
     'use strict';
     let css = [
         '.question, .answer {',
@@ -192,6 +192,6 @@ let FireFoxBullshitHack = function(){
     funcs.fetchAllPosts();
 };
 
-let FireFoxBullshitHackScript = document.createElement('script');
-FireFoxBullshitHackScript.textContent = '(' + FireFoxBullshitHack.toString() + ')()';
-document.body.appendChild(FireFoxBullshitHackScript);
+let FirefoxBullshitHackScript = document.createElement('script');
+FirefoxBullshitHackScript.textContent = '(' + FirefoxBullshitHack.toString() + ')()';
+document.body.appendChild(FirefoxBullshitHackScript);
