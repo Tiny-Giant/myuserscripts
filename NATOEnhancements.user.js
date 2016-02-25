@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -19,7 +19,7 @@ let css = [
     '    font-weight: normal',
     '}',
     '.answer {',
-    '    background: RGBA(249, 253, 66, 0.5);',
+    '    background: RGBA(255,153,0, 0.1);',
     '}'
 ].join('\n');
 
