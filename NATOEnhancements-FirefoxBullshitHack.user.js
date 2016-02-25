@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         NATO Enhancements - FireFoxBullshitHack
+// @name         NATO Enhancements - FirefoxBullshitHack
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -13,6 +13,7 @@
 
 let FirefoxBullshitHack = function(){
     'use strict';
+
     let css = [
         '.question, .answer {',
         '    width: 730px !important',
@@ -21,36 +22,30 @@ let FirefoxBullshitHack = function(){
         '    font-weight: normal',
         '}',
         '.answer {',
-        '    background: RGBA(249, 253, 66, 0.5);',
+        '    background: RGBA(255,153,0, 0.1);',
         '}'
     ].join('\n');
 
     if (false);
-    else if ("undefined" != typeof GM_addStyle) GM_addStyle(css);
+    else if ("undefined" != typeof GM_addStyle)  GM_addStyle(css);
     else if ("undefined" != typeof PRO_addStyle) PRO_addStyle(css);
-    else if ("undefined" != typeof addStyle) addStyle(css);
-    else(document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
+    else if ("undefined" != typeof addStyle)     addStyle(css);
+    else (document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
 
-    StackExchange.using("inlineEditing", function()
-    {
+    StackExchange.using("inlineEditing", function () {
         StackExchange.inlineEditing.init();
     });
 
-    let posts = [],
-        post = {},
-        funcs = {},
-        complete, Q = 1,
-        A = 2;
+    let posts = [], post = {}, funcs = {}, complete, Q = 1, A = 2;
 
     funcs.showComments = (post) =>
     {
         post.wrap.querySelector('.js-show-link.comments-link').click();
     }
 
-    funcs.initQuestion = (post, votes) =>
+    funcs.initQuestion = (post, votes) => 
     {
-        StackExchange.question.init(
-        {
+        StackExchange.question.init({
             votesCast: votes,
             canViewVoteCounts: true,
             questionId: post.id
@@ -65,7 +60,7 @@ let FirefoxBullshitHack = function(){
 
         let nsnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
 
-        while (nsnippets.length > 0 && osnippets.length > 0)
+        while(nsnippets.length > 0 && osnippets.length > 0)
         {
             let nsnippet = nsnippets.shift();
             let osnippet = osnippets.shift();
@@ -99,7 +94,7 @@ let FirefoxBullshitHack = function(){
     };
 
     funcs.fetchPost = (post, complete) =>
-    {
+    {   
         let xhr = new XMLHttpRequest();
 
         xhr.addEventListener('load', event =>
@@ -124,7 +119,7 @@ let FirefoxBullshitHack = function(){
     funcs.fetchAllPosts = () =>
     {
         post = posts.shift();
-
+        
         funcs.fetchPost(post.question, questionHTML =>
         {
             funcs.fetchPost(post.answer, answerHTML =>
@@ -132,12 +127,12 @@ let FirefoxBullshitHack = function(){
                 funcs.fetchVotes(post.question, votes =>
                 {
                     post.answer.wrap.className = '';
-                    funcs.replacePost(post.question, questionHTML);
-                    funcs.replacePost(post.answer, answerHTML);
+                    funcs.replacePost(post.question,  questionHTML);
+                    funcs.replacePost(post.answer,    answerHTML);
                     funcs.initQuestion(post.question, votes);
                     funcs.showComments(post.question);
                     funcs.showComments(post.question);
-
+                    
                     if (posts.length > 0)
                     {
                         funcs.fetchAllPosts();
@@ -151,37 +146,34 @@ let FirefoxBullshitHack = function(){
     {
         let postTexts = Array.from(document.querySelectorAll('.post-text'));
 
-        for (let postText of postTexts)
+        for(let postText of postTexts)
         {
             let parent = postText.parentNode;
             let details = parent.nextElementSibling;
             parent.parentNode.removeChild(details);
-
+            
             let questionWrap = document.createElement('div');
             parent.insertBefore(questionWrap, postText);
-
+            
             let separator = document.createElement('hr');
             parent.insertBefore(separator, postText);
-
+            
             let postLink = parent.querySelector('.answer-hyperlink');
-
+            
             postLink.parentNode.removeChild(postLink.nextElementSibling);
             postLink.parentNode.removeChild(postLink.nextElementSibling);
-
+            
             postLink.outerHTML = '<h1>' + postLink.outerHTML + '</h1>';
-
-            let postIDs = /(\d+).*?(\d+)$/.exec(postLink.href);
-
-            posts.push(
-            {
-                answer:
-                {
-                    id: postIDs[2],
+            
+            let postIDs   = /(\d+).*?(\d+)$/.exec(postLink.href);
+            
+            posts.push({
+                answer: {
+                    id:   postIDs[2],
                     wrap: postText
                 },
-                question:
-                {
-                    id: postIDs[1],
+                question: {
+                    id:   postIDs[1],
                     wrap: questionWrap
                 }
             });
