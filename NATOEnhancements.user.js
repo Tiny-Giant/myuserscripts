@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.1
+// @version      1.0.0.2
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -47,6 +47,7 @@ funcs.initQuestion = (post, votes) =>
         canViewVoteCounts: true,
         questionId: post.id
     });
+    StackExchange.realtime.subscribeToQuestion('1', post.id);
 }
 
 funcs.replacePost = (post, html) =>
