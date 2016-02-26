@@ -13,7 +13,7 @@
 
 let FirefoxBullshitHack = function(){
     'use strict';
-
+    
     let css = [
         '.question, .answer {',
         '    width: 730px !important',
@@ -25,24 +25,24 @@ let FirefoxBullshitHack = function(){
         '    background: RGBA(255,153,0, 0.1);',
         '}'
     ].join('\n');
-
+    
     if (false);
     else if ("undefined" != typeof GM_addStyle)  GM_addStyle(css);
     else if ("undefined" != typeof PRO_addStyle) PRO_addStyle(css);
     else if ("undefined" != typeof addStyle)     addStyle(css);
     else (document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
-
+    
     StackExchange.using("inlineEditing", function () {
         StackExchange.inlineEditing.init();
     });
-
+    
     let posts = [], post = {}, funcs = {}, complete, Q = 1, A = 2;
-
+    
     funcs.showComments = (post) =>
     {
         post.wrap.querySelector('.js-show-link.comments-link').click();
     }
-
+    
     funcs.initQuestion = (post, votes) => 
     {
         StackExchange.question.init({
@@ -50,30 +50,31 @@ let FirefoxBullshitHack = function(){
             canViewVoteCounts: true,
             questionId: post.id
         });
+        StackExchange.realtime.subscribeToQuestion('1', post.id);
     }
-
+    
     funcs.replacePost = (post, html) =>
     {
         let osnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
-
+    
         post.wrap.innerHTML = html;
-
+    
         let nsnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
-
+    
         while(nsnippets.length > 0 && osnippets.length > 0)
         {
             let nsnippet = nsnippets.shift();
             let osnippet = osnippets.shift();
-
+    
             nsnippet.parentNode.insertBefore(osnippet, nsnippet);
             nsnippet.parentNode.removeChild(nsnippet);
         }
     }
-
+    
     funcs.fetchVotes = (post, complete) =>
     {
         let xhr = new XMLHttpRequest();
-
+    
         xhr.addEventListener('load', event =>
         {
             if (xhr.status !== 200)
@@ -81,22 +82,22 @@ let FirefoxBullshitHack = function(){
                 console.log(xhr.status, xhr.statusText, xhr.responseText);
                 return;
             }
-
+    
             if (typeof complete === 'function')
             {
                 complete(JSON.parse(xhr.responseText));
             }
         }, false);
-
+    
         xhr.open('GET', '/posts/' + post.id + '/votes');
-
+    
         xhr.send();
     };
-
+    
     funcs.fetchPost = (post, complete) =>
     {   
         let xhr = new XMLHttpRequest();
-
+    
         xhr.addEventListener('load', event =>
         {
             if (xhr.status !== 200)
@@ -104,18 +105,18 @@ let FirefoxBullshitHack = function(){
                 console.log(xhr.status, xhr.statusText, xhr.responseText);
                 return;
             }
-
+    
             if (typeof complete === 'function')
             {
                 complete(xhr.responseText);
             }
         }, false);
-
+    
         xhr.open('GET', '/posts/ajax-load-realtime/' + post.id);
-
+    
         xhr.send();
     };
-
+    
     funcs.fetchAllPosts = () =>
     {
         post = posts.shift();
@@ -141,11 +142,11 @@ let FirefoxBullshitHack = function(){
             });
         });
     }
-
+    
     funcs.getPosts = () =>
     {
         let postTexts = Array.from(document.querySelectorAll('.post-text'));
-
+    
         for(let postText of postTexts)
         {
             let parent = postText.parentNode;
@@ -179,7 +180,7 @@ let FirefoxBullshitHack = function(){
             });
         }
     };
-
+    
     funcs.getPosts();
     funcs.fetchAllPosts();
 };
