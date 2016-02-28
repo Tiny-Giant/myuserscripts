@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.2
+// @version      1.0.0.3
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -22,53 +22,35 @@ let css = [
     '    background: RGBA(255,153,0, 0.1);',
     '}'
 ].join('\n');
+document.body.appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
 
-if (false);
-else if ("undefined" != typeof GM_addStyle)  GM_addStyle(css);
-else if ("undefined" != typeof PRO_addStyle) PRO_addStyle(css);
-else if ("undefined" != typeof addStyle)     addStyle(css);
-else (document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
+StackExchange.helpers.addSpinner(document.querySelector('.subheader h1'));
 
 StackExchange.using("inlineEditing", function () {
     StackExchange.inlineEditing.init();
 });
 
-let posts = [], post = {}, funcs = {}, complete, Q = 1, A = 2;
-
-funcs.showComments = (post) =>
-{
-    post.wrap.querySelector('.js-show-link.comments-link').click();
-}
-
-funcs.initQuestion = (post, votes) => 
-{
-    StackExchange.question.init({
-        votesCast: votes,
-        canViewVoteCounts: true,
-        questionId: post.id
-    });
-    StackExchange.realtime.subscribeToQuestion('1', post.id);
-}
+const funcs = {};
 
 funcs.replacePost = (post, html) =>
 {
-    let osnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
 
     post.wrap.innerHTML = html;
 
-    let nsnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
+    const osnippets = post.snippets;
+    const nsnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
 
     while(nsnippets.length > 0 && osnippets.length > 0)
     {
-        let nsnippet = nsnippets.shift();
-        let osnippet = osnippets.shift();
+        const nsnippet = nsnippets.shift();
+        const osnippet = osnippets.shift();
 
         nsnippet.parentNode.insertBefore(osnippet, nsnippet);
         nsnippet.parentNode.removeChild(nsnippet);
     }
-}
+};
 
-funcs.fetchVotes = (post, complete) =>
+funcs.fetchVotes = (post, complete) => new Promise((resolve, reject) =>
 {
     let xhr = new XMLHttpRequest();
 
@@ -76,7 +58,8 @@ funcs.fetchVotes = (post, complete) =>
     {
         if (xhr.status !== 200)
         {
-            console.log(xhr.status, xhr.statusText, xhr.responseText);
+            console.error(xhr);
+            reject(xhr);
             return;
         }
 
@@ -84,14 +67,16 @@ funcs.fetchVotes = (post, complete) =>
         {
             complete(JSON.parse(xhr.responseText));
         }
+        
+        resolve(xhr);
     }, false);
 
     xhr.open('GET', '/posts/' + post.id + '/votes');
 
     xhr.send();
-};
+});
 
-funcs.fetchPost = (post, complete) =>
+funcs.fetchPost = (post, complete) => new Promise((resolve, reject) =>
 {   
     let xhr = new XMLHttpRequest();
 
@@ -99,84 +84,138 @@ funcs.fetchPost = (post, complete) =>
     {
         if (xhr.status !== 200)
         {
-            console.log(xhr.status, xhr.statusText, xhr.responseText);
+            console.error(xhr);
+            reject(xhr);
             return;
         }
-
+        
         if (typeof complete === 'function')
         {
             complete(xhr.responseText);
         }
+        
+        resolve(xhr);
     }, false);
 
     xhr.open('GET', '/posts/ajax-load-realtime/' + post.id);
 
     xhr.send();
-};
+});
 
-funcs.fetchAllPosts = () =>
+funcs.fetchAllPosts = posts =>
 {
-    post = posts.shift();
+    const promises = [];
     
-    funcs.fetchPost(post.question, questionHTML =>
+    const postvotes = [];
+    
+    for(let post of posts)
     {
-        funcs.fetchPost(post.answer, answerHTML =>
+        // Get posts
+        promises.push(funcs.fetchPost(post.question, html => 
         {
-            funcs.fetchVotes(post.question, votes =>
+            funcs.replacePost(post.question, html);
+        }));
+        promises.push(funcs.fetchPost(post.answer, html => 
+        {
+            funcs.replacePost(post.answer, html);
+            post.answer.wrap.className = '';
+        }));
+        
+        // Get votes
+        promises.push(funcs.fetchVotes(post.question, votes =>
+        {
+            for(let post of votes)
             {
-                post.answer.wrap.className = '';
-                funcs.replacePost(post.question,  questionHTML);
-                funcs.replacePost(post.answer,    answerHTML);
-                funcs.initQuestion(post.question, votes);
-                funcs.showComments(post.question);
-                funcs.showComments(post.question);
-                
-                if (posts.length > 0)
-                {
-                    funcs.fetchAllPosts();
-                }
-            });
+                postvotes.push(post);
+            }
+        }));
+        promises.push(funcs.fetchVotes(post.answer, votes =>
+        {
+            for(let post of votes)
+            {
+                postvotes.push(post);
+            }
+        }));
+    }
+    
+    Promise.all(promises).then(xhr =>
+    {
+        console.log(xhr);
+        
+        StackExchange.question.init({
+            votesCast: postvotes,
+            canViewVoteCounts: true,
+            questionId: posts[0].question.id,
+            canOpenBounty:true
         });
+        
+        const commentLinks = Array.from(document.querySelectorAll('.js-show-link.comments-link'));
+        
+        for(let commentLink of commentLinks)
+        {
+            commentLink.click();
+        }
+        
+        for(let post of posts)
+        {
+            StackExchange.realtime.subscribeToQuestion('1', post.question.id);
+        }
+        
+        StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
+    },xhr =>
+    {
+        console.log('Failed', xhr);
     });
-}
+};
 
 funcs.getPosts = () =>
 {
-    let postTexts = Array.from(document.querySelectorAll('.post-text'));
+    const posts = [];
+    const answers = Array.from(document.querySelectorAll('.post-text'));
 
-    for(let postText of postTexts)
+    for(let answer of answers)
     {
-        let parent = postText.parentNode;
-        let details = parent.nextElementSibling;
-        parent.parentNode.removeChild(details);
+        const nodes = {};
         
-        let questionWrap = document.createElement('div');
-        parent.insertBefore(questionWrap, postText);
+        nodes.answer = answer;
+        nodes.question = document.createElement('div');
+        nodes.snippets = Array.from(nodes.answer.querySelectorAll('.snippet'));
         
-        let separator = document.createElement('hr');
-        parent.insertBefore(separator, postText);
+        nodes.parent = answer.parentNode;
+        nodes.details = nodes.parent.nextElementSibling;
+        nodes.title = nodes.parent.querySelector('.answer-hyperlink');
         
-        let postLink = parent.querySelector('.answer-hyperlink');
-        
-        postLink.parentNode.removeChild(postLink.nextElementSibling);
-        postLink.parentNode.removeChild(postLink.nextElementSibling);
-        
-        postLink.outerHTML = '<h1>' + postLink.outerHTML + '</h1>';
-        
-        let postIDs   = /(\d+).*?(\d+)$/.exec(postLink.href);
+        const urlsections = /(\d+)\/(.*?)\/(\d+)/.exec(nodes.title.href);
+        const questionid = urlsections[1];
+        const titleslug = urlsections[2];
+        const answerid = urlsections[3];
         
         posts.push({
             answer: {
-                id:   postIDs[2],
-                wrap: postText
+                id:   answerid,
+                wrap: nodes.answer,
+                snippets: []
             },
             question: {
-                id:   postIDs[1],
-                wrap: questionWrap
+                id:   questionid,
+                wrap: nodes.question,
+                snippets: []
             }
         });
+        
+        nodes.title.href = window.location.protocol + '//' + window.location.host + '/questions/' + questionid + '/' + titleslug;
+        nodes.title.className = '';
+        nodes.parent.insertBefore(nodes.question, nodes.answer);
+        nodes.parent.insertBefore(document.createElement('br'), nodes.answer);
+        nodes.title.parentNode.removeChild(nodes.title.nextElementSibling);
+        nodes.title.parentNode.removeChild(nodes.title.nextElementSibling);
+        nodes.parent.parentNode.removeChild(nodes.details);
+        nodes.title.outerHTML = '<h1>' + nodes.title.outerHTML + '</h1>';
     }
+    
+    return posts;
 };
 
-funcs.getPosts();
-funcs.fetchAllPosts();
+const posts = funcs.getPosts();
+
+funcs.fetchAllPosts(posts);
