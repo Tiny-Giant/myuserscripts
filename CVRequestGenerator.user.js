@@ -1,416 +1,656 @@
 // ==UserScript==
-// @name           Stack Exchange CV Request Generator
+// @name           CV Request Generator
 // @namespace      https://github.com/SO-Close-Vote-Reviewers/
-// @version        1.5.8
+// @version        2.0.0.0
 // @description    This script generates formatted close vote requests and sends them to a specified chat room
 // @author         @TinyGiant
-// @include        /^https?:\/\/\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/q(uestions)?\/\d+/
-// @require        https://code.jquery.com/jquery-2.1.4.min.js
-// @updateURL      https://rawgit.com/SO-Close-Vote-Reviewers/UserScripts/master/SECloseVoteRequestGenerator.user.js
+// @include        /^https?:\/\/\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
+// @updateURL      https://github.com/Tiny-Giant/myuserscripts/raw/master/CVRequestGenerator.user.js
 // @grant          GM_xmlhttpRequest
+// @grant          GM_addStyle
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esversion: 6 */
 'use strict';
 
-if(!("StackExchange" in window))
+const scriptName = GM_info.script.name.replace(/\s+/g, '');
+const scriptVersion = GM_info.script.version;
+const scriptURL = GM_info.script.updateURL;
+const scriptVersionURL = 'https://github.com/Tiny-Giant/myuserscripts/raw/master/CVRequestGenerator.version';
+
+let css = [
+    '.post-menu > span > a {',
+    '    padding:0 3px 2px 3px;',
+    '    color:#888;',
+    '}',
+    '.post-menu > span > a:hover {',
+    '    color:#444;',
+    '    text-decoration:none;',
+    '}',
+    '.cvrgui {',
+    '    position:relative;',
+    '    display:inline-block;',
+    '}',
+    '.cvrgui * {',
+    '    box-sizing: border-box;',
+    '}',
+    '.cv-list {',
+    '    display: none;',
+    '    margin:0;',
+    '    padding: 0;',
+    '    z-index:1;',
+    '    position:absolute;',
+    '    white-space:nowrap;',
+    '    border:1px solid #ccc;',
+    '    border-radius: 5px;',
+    '    background:#FFF;',
+    '    box-shadow:0px 5px 10px -5px rgb(0,0,0,0.5);',
+    '}',
+    '.cv-list .cv-request {',
+    '    padding: 6px;',
+    '}',
+    '.cv-list input {',
+    '    display: inline-block;',
+    '    font-size: 13px;',
+    '    line-height: 15px;',
+    '    padding: 8px 10px;',
+    '    box-sizing: border-box;',
+    '    border-radius: 0;',
+    '    margin: 0px;',
+    '}',
+    '.cv-list input[type="text"] {',
+    '    border-top-left-radius: 3px;',
+    '    border-bottom-left-radius: 3px;',
+    '}',
+    '.cv-list input[type="submit"] {',
+    '    border-top-right-radius: 3px;',
+    '    border-bottom-right-radius: 3px;',
+    '}',
+    '.cv-list dd {',
+    '    margin: 0;',
+    '    padding: 0;',
+    '}',
+    '.cv-list .cv-update a {',
+    '    border-top: 1px solid #ccc;',
+    '    display: block;',
+    '    padding: 10px;',
+    '    text-align: center;',
+    '}',
+    '.cv-list .cv-update a:hover {',
+    '    background: #eee;',
+    '    border-bottom-left-radius: 5px;',
+    '    border-bottom-right-radius: 5px;',
+    '}',
+    '.cv-list * {',
+    '    vertical-align: middle;',
+    '}',
+    '.cv-popup-box {',
+    '    padding: 5px;',
+    '}',
+    '.cv-popup-box input {',
+    '    margin: 0px;',
+    '}'
+].join('\n');
+
+if (false);
+else if ("undefined" != typeof GM_addStyle)  GM_addStyle(css);
+else if ("undefined" != typeof PRO_addStyle) PRO_addStyle(css);
+else if ("undefined" != typeof addStyle)     addStyle(css);
+else (document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
+
+if (!("StackExchange" in window))
 {
-    window.StackExchange = unsafeWindow.StackExchange;
+    StackExchange = unsafeWindow.StackExchange;
 }
 
-console.log(GM_info);
-/*
-let URL = "https://rawgit.com/SO-Close-Vote-Reviewers/UserScripts/master/SECloseVoteRequestGenerator.user.js";
-let notifyint = 0;
-function notify(m,t) {
-    let timeout;
-    (function(i){
-        let div = $('#notify-' + (i - 1));
-        if(div.length) {
-            clearTimeout(timeout);
-            if(i > 1)StackExchange.notify.close(i-1);
-        }
-        StackExchange.notify.show(m,i);
-        if(t) timeout = setTimeout(function(){
-            StackExchange.notify.close(i);
-        },t);
-    })(++notifyint);
-}
+let globals = {};
 
-function isVersionNewer(proposed, current) {
-    proposed = proposed.split(".");
-    current = current.split(".");
+globals.room = {
+    "host": "http://chat.stackoverflow.com",
+    "url": "http://chat.stackoverflow.com/rooms/41570/so-close-vote-reviewers",
+    "id": "41570",
+};
 
-    while (proposed.length < current.length) proposed.push("0");
-    while (current.length < proposed.length) current.push("0");
+// Use this room for testing.
+/*globals.room = {
+    "host": "https://chat.stackoverflow.com",
+    "url": "https://chat.stackoverflow.com/rooms/68414/socvr-testing-facility",
+    "id": "68414"
+};*/
 
-    for (let i = 0; i < proposed.length; i++) {
-        if (parseInt(proposed[i]) > parseInt(current[i])) {
-            return true;
-        }
-        if (parseInt(proposed[i]) < parseInt(current[i])) {
-            return false;
-        }
-    }
-    return false;
-}
+globals.fkey = undefined;
 
-function checkUpdates(force) { 
-    GM_xmlhttpRequest({
-        method: 'GET',
-        url: 'https://rawgit.com/SO-Close-Vote-Reviewers/UserScripts/master/SECloseVoteRequestGenerator.version',
-        onload: function(response) {
-            let VERSION = response.responseText.trim();
-            if(isVersionNewer(VERSION,GM_info.script.version)) {
-                let lastAcknowledgedVersion = getStorage('LastAcknowledgedVersion');
-                if(lastAcknowledgedVersion != VERSION || force) {
-                    if(confirm('A new version of The Close Vote Request Generator is available, would you like to install it now?'))
-                        window.location.href = URL;
-                    else
-                        setStorage('LastAcknowledgedVersion',VERSION);
-                }
-            } else if(force) notify('No new version available');
-        }
-    });
-}
+globals.base = window.location.protocol + '//' + window.location.host;
 
-function hideMenu() {
-    closeTarget();
-    $('div', CVRGUI.items.send).hide();
-    CVRGUI.list.hide();
-}
-
-function sendRequest(result) {
-    RoomList.getRoom(function(room){
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: room.url,
-            onload: function(response) {
-                let fkey = response.responseText.match(/hidden" value="([\dabcdef]{32})/)[1];
-                if(!fkey) {
-                    notify('Failed retrieving key, is the room URL valid?');
-                    return false;
-                }
-                GM_xmlhttpRequest({
-                    method: 'POST',
-                    url: room.host + '/chats/' + room.id + '/messages/new',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    data: 'text=' + encodeURIComponent(result) + '&fkey=' + fkey,
-                    onload: function() {
-                        notify('Close vote request sent.',1000);
-                        hideMenu();
-                    },
-                    onerror: function() {
-                        notify('Failed sending close vote request.');
-                        hideMenu();
-                    }
-                });
-            },
-            onerror: function() {
-                notify('Failed retrieving fkey from chat.');
-            }
-        });
-    });
-}
-
-function appendInfo() {
-    if(getStorage('appendInfo') === "1") return true;
-    return false;
-}
-
-let RoomList = {};
-RoomList.rooms = {};
-RoomList.save = function() {
-    setStorage('rooms',JSON.stringify(this.rooms));
-    console.log(getStorage('rooms'));
-};
-RoomList.each = function(callback) {
-    for(let i in this.rooms)
-        callback(this.rooms[i],i);
-    return this;
-};
-RoomList.search = function(key,value) {
-    let success;
-    this.each(function(room){
-        if(room[key] === value)
-            success = room;
-    });
-    return success;
-};
-RoomList.count = function() {
-    return Object.keys(this.rooms).length;
-};
-RoomList.name = function(name)  { return this.search('name',name);  };
-RoomList.index = function(name) { return this.search('index',name); };
-RoomList.id = function(name)    { return this.search('id',name);    };
-RoomList.url = function(name)   { return this.search('url',name);   };
-RoomList.insert = function(room) {
-    if(!RoomList.url(room.url)) {
-        this.rooms[room.url] = room;
-        this.save();
-    }
-    return this.rooms[room.url];
-};
-RoomList.getRoom = function(callback,url) {
-    let rooms = this.rooms;
-    if(!url) 
-        url = getStorage(base + 'room');*/
-    //let m = /(https?:\/\/chat\.(meta\.)?stack(overflow|exchange)\.com)\/rooms\/(.*)\/.*/.exec(url);
-    /*if(m) {
-        let room = RoomList.url(url);
-        if(room) {
-            if(callback) callback(room);
-            return false;
-        }
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: url,
-            onload: function(response){*/
-                //let name = /.*<title>(.*)\ \|.*/.exec(response.response);
-                /*if(!name) {
-                    notify('Failed finding room name. Is it a valid room?');
-                    if(callback) callback(false);
-                } else {
-                    if(callback) callback(RoomList.insert({ 
-                        host: m[1],
-                        url: url,
-                        id: m[4],
-                        name: name[1]
-                    }));
-                }
-            },
-            onerror: function(){
-                notify('Failed retrieving room name. Is it a valid room?');
-                if(callback) callback(false);
-            }
-        });
-    } else {
-        console.log(url);
-        notify('The chat room URL you supplied is invalid.');
-        if(callback) callback(false);
-    }
-};
-RoomList.setRoom = function(url) {
-    let exists;
-    if(this.url(url))
-        exists = true;
-    RoomList.getRoom(function(room) {
-        if(room && getStorage(base + 'room') !== room.url) {
-            setStorage(base + 'room',room.url);
-            CVRGUI.roomList.find('[type="checkbox"]').prop('checked',false);
-            if(!exists)
-                CVRGUI.roomList.append($('<dd><label><input type="radio" name="target-room" value="' + room.url + '" checked>' + room.name + '</label><form><button>-</button></form></dd>'));
-            else
-                CVRGUI.roomList.find('[value="' + room.url + '"]').prop('checked', true);
-            closeTarget();
-        }
-    },url);
-};
-RoomList.init = function() {
-    if(!getStorage('rooms'))
-        RoomList.getRoom();
-    else
-        RoomList.rooms = JSON.parse(getStorage('rooms'));
-};
+let funcs = {};
 
 //Wrap local storage access so that we avoid collisions with other scripts
-let prefix = "SECloseVoteRequestGenerator_"; //prefix to avoid clashes in localstorage
-function getStorage(key) { return localStorage[prefix + key]; }
-function setStorage(key, val) { return (localStorage[prefix + key] = val); }
+funcs.getStorage = key => localStorage[scriptName + '_' + key]; 
+      
+funcs.setStorage = (key, val) => (localStorage[scriptName + '_' + key] = val); 
 
-let base = 'http://' + window.location.hostname;
+funcs.notify = (() =>
+{
+    let count = 0;
 
-if(!getStorage(base + 'room'))
-    setStorage(base + 'room', 'http://chat.stackoverflow.com/rooms/41570/so-close-vote-reviewers');
+    return (message, time) =>
+    {
+        StackExchange.notify.show(message, ++count);
 
-RoomList.init();
-
-let CVRGUI = {};
-CVRGUI.wrp    = $('<span class="cvrgui" />');
-CVRGUI.button = $('<a href="javascript:void(0)" class="cv-button">cv-pls</a>');
-CVRGUI.list   = $('<dl class="cv-list" />');
-CVRGUI.css    = $('<style>.post-menu > span > a{padding:0 3px 2px 3px;color:#888}.post-menu > span > a:hover{color:#444;text-decoration:none} .cvrgui { position:relative;display:inline-block } .cvrgui * { box-sizing: border-box } .cv-list { display: none; margin:0; z-index:1; position:absolute; white-space:nowrap; border:1px solid #ccc;border-radius:3px;background:#FFF;box-shadow:0px 5px 10px -5px rgb(0,0,0,0.5) } .cv-list dd, .cv-list dl { margin: 0; padding: 0; } .cv-list dl dd { padding: 0px; margin: 0; width: 100%; display: table } .cv-list dl label, .cv-list dl form { display: table-cell } .cv-list dl button { margin: 2.5px 0; } .cv-list dl label { width: 100%; padding: 0px; }  .cv-list * { vertical-align: middle; } .cv-list dd > div { padding: 0px 15px; padding-bottom: 15px; } .cv-list dd > div > form { white-space: nowrap } .cv-list dd > div > form > input { display: inline-block; vertical-align: middle } .cv-list dd > div > form > input[type="text"] { width: 300px; margin-right: 5px; } .cv-list hr { margin:0 15px; border: 0px; border-bottom: 1px solid #ccc; } .cv-list a { display: block; padding: 10px 15px;}  .cv-list label { display: inline-block; padding: 10px 15px;} .cv-list label:last-child { padding-left: 0; }</style>');
-CVRGUI.target = (function(){
-    let link = $('<a href="javascript:void(0)"></a>').on('click',function(){
-        let div = $('div', $(this).parent());
-        $('div', CVRGUI.list).not(div).hide();
-        if(div.is(':hidden')) {
-            div.show().find('[type="text"]').focus();
-            $(this).html('Set target room:');
-        } else closeTarget();
-    })
-    RoomList.getRoom(function(room){
-        link.html(room.name);
-    });
-    return link;
+        if (typeof time === "number" && !isNaN(time))
+        {
+            setTimeout(StackExchange.notify.close.bind(null, count), time);
+        }
+    };
 })();
-function closeTarget() {
-    RoomList.getRoom(function(room){ $(CVRGUI.target).html(room.name); });
-    $('div', CVRGUI.items.room).hide();
-    $('div', CVRGUI.items.send).show();
-    $('input[type="text"]', CVRGUI.items.send).focus();
-}
-CVRGUI.items  = {
-    send:    $('<dd><a href="javascript:void(0)">Send request</a><div style="display:none"><form><input type="text"/><input type="submit" value="Send"></form></div><hr></dd>'),
-    room:    (function(){
-        let item = $('<dd></dd>');
-        let list = $('<dl>');
-        let div = $('<div style="display:none"/>');
-        RoomList.getRoom(function(r){
-            RoomList.each(function(room){
-                list.append($('<dd><label><input type="radio" name="target-room" value="' + room.url + '"' + (r.url === room.url ? ' checked' : '' ) + '>' + room.name + '</label><form><button>-</button></form></form></dd>'));
-            });
-            list.on('change',function(e){
-                RoomList.setRoom(e.target.value);
-            });
-            list.on('submit', function(e){
-                e.preventDefault();
-                let room = RoomList.url($('[name="target-room"]', $(e.target).parent()).val());
-                if(room) {
-                    if(RoomList.count() === 1) {
-                        notify('Cannot remove last room');
-                        return false;
-                    }
-                    if($('[checked]', $(e.target).parent()).length) {
-                        RoomList.setRoom($('input[name="target-room"]:not([value="' + room.url + '"])', list).val());
-                    }
-                    delete RoomList.rooms[room.url];
-                    RoomList.save();
-                    $(e.target).parent().remove();
+
+funcs.update = force => new Promise((resolve, reject) =>
+{ 
+    GM_xmlhttpRequest(
+    {
+        method: 'GET',
+        url: scriptVersionURL,
+        onload: xhr =>
+        {
+            let newVersion = xhr.responseText.trim();
+
+            let proposed = newVersion.split(".");
+            let current = scriptVersion.split(".");
+
+            let isNewer = false;
+
+            while(proposed.length < current.length)
+            {
+                proposed.push("0");
+            }
+            while(proposed.length > current.length)
+            {
+                current.push("0");
+            }
+
+            for(let i = 0; i < proposed.length; i++)
+            {
+                if (+proposed[i] > +current[i])
+                {
+                    isNewer = true;
+                    break;
                 }
-            });
-            div.append(list);
-            div.append($('<form><input type="text"/><input type="submit" value="Set"></form>').on('submit',function(e) {
-                e.preventDefault();
-                let response = $('input[type="text"]', this).val();
-                if(!response) return false;
-                RoomList.setRoom(response);
-            }));
-            item.append(CVRGUI.target);
-            item.append(div);
-            item.append($('<hr>'));
-            CVRGUI.roomList = list;
-        });
-        return item;
-    })(),
-    update:  $('<dd><a href="javascript:void(0)">Check for updates</a>   </dd>')
-};
-for(let item in CVRGUI.items) {
-    CVRGUI.list.append(CVRGUI.items[item]);
-}
-CVRGUI.wrp.append(CVRGUI.button);
-CVRGUI.wrp.append(CVRGUI.list);
-CVRGUI.wrp.append(CVRGUI.css);
+                if (+proposed[i] < +current[i])
+                {
+                    isNewer = false;
+                    break;
+                }
+            }
 
-$('#question .post-menu').append(CVRGUI.wrp);
-
-$('.question').on('click', '[type="submit"], .new-post-activity a', function(e){
-    let self = this;
-    let menuCheck = setInterval(function(){
-        if($('#question .post-menu').length === 1) {
-            clearInterval(menuCheck);
-            $('#question .post-menu').append(CVRGUI.wrp);
+            if (isNewer)
+            {
+                if (funcs.getStorage('LastAcknowledgedVersion') != newVersion || force)
+                {
+                    if (confirm('A new version of the CV Request Generator is available, would you like to install it now?'))
+                    {
+                        window.location.href = scriptURL;
+                    }
+                    else
+                    {
+                        funcs.setStorage('LastAcknowledgedVersion', newVersion);
+                    }
+                }
+            }
+            else 
+            {
+                if (force) 
+                {
+                    funcs.notify('No new version available');
+                }
+            }
+            
+            resolve(xhr);
+        },
+        onerror: xhr =>
+        {
+            funcs.notify('Failed querying new script version. Check the console.');
+            console.log(xhr);
+            reject(xhr);
         }
     });
 });
 
-$(document).on('click',function(){
-    if(CVRGUI.list.is(':visible'))
-        hideMenu();
+funcs.getFKey = () => new Promise((resolve, reject) => 
+{
+    GM_xmlhttpRequest(
+    {
+        method: 'GET',
+        url: globals.room.url,
+        onload: xhr => 
+        {
+            let fkey = xhr.responseText.match(/hidden" value="([\dabcdef]{32})/)[1];
+
+            if (fkey !== null) 
+            {
+                globals.fkey = fkey;
+                resolve(fkey);
+            }
+            else
+            {
+                funcs.notify('Failed retrieving key, Check the console.');
+                console.log(xhr);
+                reject(xhr);
+            }
+        },
+        onerror: xhr =>
+        {
+            funcs.notify('Failed retrieving key. Check the console.');
+            console.log(xhr);
+            reject(xhr);
+        }
+    });
 });
 
-$('a:not(.cvrgui a)').on('click',function(){
-    if(CVRGUI.list.is(':visible')) 
-        hideMenu();
-});
-$('.cv-list *:not(a)').on('click',function(e){
-    e.stopPropagation();
-});
-
-CVRGUI.button.on('click', function(e){ 
-    e.stopPropagation();
-    $('div', CVRGUI.list).hide();
-    CVRGUI.list.toggle(); 
-});
-
-CVRGUI.items.send.on('click',function(e){
-    e.stopPropagation();
-    if($('div', CVRGUI.items.send).is(':hidden'))
-        closeTarget();
-    else $('div', CVRGUI.items.send).hide();
-});
-
-$('form', CVRGUI.items.send).on('submit',function(e){
-    e.preventDefault();
-    let reason = $('input[type="text"]', CVRGUI.items.send).val();
-    if(!reason) return false;
-    reason = reasons.get(reason);
-    let tit = '[' + $('#question-header h1 a').text().replace(/\[(.*)\]/g, '($1)') + '](' + base + $('#question .short-link').attr('href') + ')'; 
-    let usr = $('.post-signature:not([align="right"]) .user-details').text().trim().match(/[^\n]+/)[0].trim(), tim;
-    if($('#question .owner a').length) usr = '[' + usr + '](' + base + $('#question .owner a').attr('href') + ')';
-    if($('#question .owner .relativetime').length) tim = $('#question .owner .relativetime').attr('title');
-    let result = '[tag:cv-pls] ' + reason + ' ' + tit + ' - ' + usr + (tim ? ' - ' + tim : '');
-    sendRequest(result);
+funcs.request = request => new Promise((resolve, reject) => 
+{   
+    if(typeof globals.fkey === 'undefined')
+    {
+        funcs.notify('Fkey not set.');
+        reject('FKey not set.');
+        return;
+    }
+    
+    GM_xmlhttpRequest(
+    {
+        method: 'POST',
+        url: globals.room.host + '/chats/' + globals.room.id + '/messages/new',
+        headers: 
+        {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        data: 'text=' + encodeURIComponent(request) + '&fkey=' + globals.fkey,
+        onload: xhr => {
+            funcs.notify('Close vote request sent.',1000);
+            resolve(xhr);
+        },
+        onerror: xhr =>
+        {
+            funcs.notify('Failed sending close vote request. Check the console.');
+            console.log(xhr);
+            reject(xhr);
+        }
+    });
 });
 
-CVRGUI.items.update.on('click',function(e){
-    e.stopPropagation();
-    hideMenu();
-    checkUpdates(true);
-});
+funcs.addXHRListener = callback =>
+{
+    let open = XMLHttpRequest.prototype.open;
 
-let combo;
-$(document).keydown(function(e) {
-    if(e.ctrlKey && e.shiftKey && e.which === 65) {
-        e.preventDefault();
-        combo = true;
+    XMLHttpRequest.prototype.open = function() 
+    {
+        this.addEventListener('load', callback.bind(null, this), false);
+        open.apply(this, arguments);
+    };
+};
+
+class CVRGUI
+{
+    constructor(scope)
+    {
+        if (!(scope instanceof HTMLElement))
+        {
+            funcs.notify('Error building CV Request Generator GUI. Check the console.');
+            console.log('CVRGUI expects scope to be an instance of HTML element.', scope);
+            return;
+        }
+        
+        this.question = {};
+        
+        this.question.id = scope.dataset.questionid;
+        
+        if (typeof this.question.id === 'undefined')
+        {
+            console.log('Question ID is not defined.', scope);
+        }
+        
+        this.question.title = (() => 
+        {
+            let title = document.querySelector('a[href*="questions/' + this.question.id + '"]');
+            
+            if (title === null || /#/.test(title.href))
+            {
+                title = document.querySelector('a[href*="q/' + this.question.id + '"]');
+                
+                if (title === null || /#/.test(title.href))
+                {
+                    return 'Title not found';
+                }
+            }
+            
+            return title.textContent.replace(/\[(.*)\]/g, '($1)');
+        })();
+        
+        this.question.url = window.location.protocol + '//' + window.location.host + '/q/' + this.question.id;
+        
+        this.question.time = (() => 
+        {
+            let time = scope.querySelector('.owner .relativetime');
+            
+            if (time === null)
+            {
+                return time.title;
+            }
+        })();
+        
+        this.question.author = {};
+        
+        this.question.author.name = (() => 
+        {
+            let details = scope.querySelector('.post-signature:not([align="right"]) .user-details');
+            
+            if (details === null)
+            {
+                return 'Author not found';
+            }
+            
+            return details.textContent.trim().split('\n')[0].trim();
+        })();
+        
+        this.question.author.url = (() =>
+        {
+            let link = scope.querySelector('.owner a');
+            
+            if (link !== null)
+            {
+                return link.href;
+            }
+        })();
+        
+        this.nodes = {};
+        
+        this.nodes.scope = scope;
+        
+        this.nodes.menu = this.nodes.scope.querySelector('.post-menu');
+        
+        if (this.nodes.menu === null)
+        {
+            return;
+        }
+        
+        this.nodes.wrap = document.createElement('span');
+        this.nodes.wrap.className = 'cvrgui';
+        this.nodes.menu.appendChild(this.nodes.wrap);
+        this.nodes.wrap.addEventListener('click', event =>
+        {
+            event.stopPropagation();
+        }, false);
+        
+        this.nodes.button = document.createElement('a');
+        this.nodes.button.href = '#';
+        this.nodes.button.className = 'cv-button';
+        this.nodes.button.textContent = 'cv-pls';
+        this.nodes.wrap.appendChild(this.nodes.button);
+        this.nodes.button.addEventListener('click', event =>
+        {
+            this.nodes.list.toggle();
+            event.preventDefault();
+        }, false);
+        
+        this.nodes.list = document.createElement('dl');
+        this.nodes.list.className = 'cv-list';
+        this.nodes.wrap.appendChild(this.nodes.list);
+        this.nodes.list.hidden = true;
+        this.nodes.list.hide = () => 
+        {
+            this.nodes.list.hidden = true;
+            this.nodes.list.style.display = '';
+        };
+        this.nodes.list.show = () => 
+        {
+            this.nodes.list.hidden = false;
+            this.nodes.list.style.display = 'block';
+        };
+        this.nodes.list.toggle = () => 
+        {
+            this.nodes.list.hidden = !this.nodes.list.hidden;
+            this.nodes.list.style.display = ['block',''][+this.nodes.list.hidden];
+        };
+        document.addEventListener('click', event =>
+        {
+            if (!this.nodes.list.hidden)
+            {
+                this.nodes.list.hide();
+            }
+        }, false);
+        
+        this.nodes.request = {};
+        
+        this.nodes.request.send = reason =>
+        {
+            let title = '[' + this.question.title + '](' + this.question.url + ')'; 
+            let user = this.question.author.name;
+            
+            if (this.question.author.url)
+            {
+                user = '[' + this.question.author.name + '](' + this.question.author.url + ')';
+            }
+            
+            let time = this.question.time;
+            
+            if (time !== undefined)
+            {
+                user += ' - ' + time;
+            }
+            
+            let before = '[tag:cv-pls] ';
+            let after = ' ' + title + ' - ' + user;
+            
+            let remaining = 500 - (before.length + after.length);
+            
+            if (reason.length > remaining)
+            {
+                reason = reason.substr(0, remaining - 3).trim() + '...';
+            }
+            
+            let request = before + reason + after;
+            
+            console.log(request, request.length);
+            
+            funcs.getFKey().then(response => 
+            {
+                funcs.request(request).then(response =>
+                {
+                    this.nodes.list.hide();
+                });
+            });
+        };
+        
+        this.nodes.request.item = document.createElement('dd');
+        this.nodes.request.item.className = 'cv-request';
+        this.nodes.list.appendChild(this.nodes.request.item);
+        
+        this.nodes.request.form = document.createElement('form');
+        this.nodes.request.item.appendChild(this.nodes.request.form);
+        this.nodes.request.form.addEventListener('submit', event =>
+        {
+            event.preventDefault();
+            
+            let reason = this.nodes.request.input.value;
+            
+            if (reason === '') 
+            {
+                return;
+            }
+            
+            this.nodes.request.send(reason);
+        }, false);
+            
+        this.nodes.request.input = document.createElement('input');
+        this.nodes.request.input.type = 'text';
+        this.nodes.request.input.placeholder = 'Enter reason here...';
+        this.nodes.request.input.value = funcs.getStorage(this.question.id + '-reason') || '';
+        this.nodes.request.form.appendChild(this.nodes.request.input);
+            
+        this.nodes.request.submit = document.createElement('input');
+        this.nodes.request.submit.type = 'submit';
+        this.nodes.request.submit.value = 'Send';
+        this.nodes.request.form.appendChild(this.nodes.request.submit);
+        
+        this.nodes.update = {};
+        
+        this.nodes.update.item = document.createElement('dd');
+        this.nodes.update.item.className = 'cv-update';
+        this.nodes.list.appendChild(this.nodes.update.item);
+        
+        this.nodes.update.link = document.createElement('a');
+        this.nodes.update.link.href = '#';
+        this.nodes.update.link.textContent = 'Update';
+        this.nodes.update.item.appendChild(this.nodes.update.link);
+        this.nodes.update.link.addEventListener('click', event =>
+        {
+            event.preventDefault();
+            funcs.update(true);
+        }, false);
+    }
+}
+
+let questions = Array.from(document.querySelectorAll('.question'));
+
+let CVRGUIs = {};
+          
+for(let question of questions)
+{
+    let gui = new CVRGUI(question);
+    
+    if (typeof gui !== 'undefined')
+    {
+        CVRGUIs[gui.question.id] = gui;
+    }
+}
+
+funcs.addXHRListener(xhr => 
+{
+    if (/ajax-load-realtime/.test(xhr.responseURL))
+    {
+        var matches = /question" data-questionid="(\d+)/.exec(xhr.responseText);
+        
+        if (matches === null)
+        {
+            return;
+        }
+        
+        let question = document.querySelector('[data-questionid="' + matches[1] + '"]');
+        
+        if (question === null)
+        {
+            return;
+        }
+        
+        let gui = new CVRGUI(question);
+        
+        CVRGUIs[gui.question.id] = gui;
     }
 });
-$(document).keyup(function(e) {
-    if(combo) {
-        combo = false;
-        if($('div', CVRGUI.items.send).is(':hidden')) {
-            CVRGUI.list.show();
-            $('div', CVRGUI.items.send).show().find('input[type="text"]').focus();
-        } else {
-            hideMenu();
-        }
-    } 
-});
-setTimeout(checkUpdates);
-let closereasons = {
-    4: "General Computing",
-    7: "Serverfault.com",
-    16: "Request for Off-Site Resource",
-    13: "No MCVE",
-    11: "Typo or Cannot Reproduce",
-    3: "custom",
-    2: "Belongs on another site"
-};
-$('.close-question-link').click(function(){
-    let cpcheck = setInterval(function(){
-        let popup = $('#popup-close-question'), selected;
-        if(!popup.length) return;
-        clearInterval(cpcheck);
-        let remainingvotes = $('.remaining-votes', popup);
 
-        if($('input', remainingvotes).length) return false;
+(() =>
+{
+    let nodes = {};
+    
+    nodes.label = document.createElement('label');
+    nodes.label.className = 'cv-popup-box';
 
-        let checkbox = $('<label><input type="checkbox" style="vertical-align:middle;margin-left: 5px;">Send cv-pls request</label>');
+    nodes.checkbox = document.createElement('input');
+    nodes.checkbox.type = 'checkbox';
+    nodes.label.appendChild(nodes.checkbox);
 
-        $('.remaining-votes', popup).append(checkbox);
-        $('[name="close-reason"]').change(function(){
-            this.checked && (selected = $(this)) && $('input[type="text"]', CVRGUI.items.send).val(this.value.replace(/(?!^)([A-Z])/g, ' $1'));
-        });
-        $('[name="close-as-off-topic-reason"]').change(function(){
-            this.checked && (selected = $(this)) && $('input[type="text"]', CVRGUI.items.send).val(closereasons[this.value]);
-        });
-        $('.popup-submit').click(function() {
-            if(selected.val() === '3') {
-                let parent = selected.parent().parent();
-                $('input[type="text"]', CVRGUI.items.send).val($('textarea',parent).val().replace($('[type="hidden"]',parent).val(),''));
+    nodes.text = document.createTextNode(' cv-pls');
+    nodes.label.appendChild(nodes.text);
+    
+    funcs.addXHRListener(xhr =>
+    {
+        if (/close\/popup/.test(xhr.responseURL))
+        {
+            nodes.popup = document.querySelector('#popup-close-question');
+
+            if (nodes.popup === null)
+            {
+                return;
             }
-            checkbox.find('input').is(':checked') && $('form', CVRGUI.items.send).submit();
-        });
-    }, 100);
-});*/
+
+            nodes.votes = nodes.popup.querySelector('.remaining-votes');
+
+            if (nodes.votes === null)
+            {
+                return;
+            }
+
+            nodes.votes.appendChild(nodes.label);
+            
+            nodes.textarea = nodes.popup.querySelector('textarea');
+            
+            nodes.submit = nodes.popup.querySelector('.popup-submit');
+        }
+    });
+    
+    funcs.addXHRListener(xhr =>
+    {
+        if (/close\/add/.test(xhr.responseURL))
+        {
+            console.log(nodes.checkbox.checked);
+            if (!nodes.checkbox.checked)
+            {
+                return;
+            }
+            
+            let questionid = /\d+/.exec(xhr.responseURL);
+            console.log(questionid);
+            
+            if (questionid === null)
+            {
+                return;
+            }
+            
+            questionid = questionid[0];
+            console.log(questionid);
+            
+            let gui = CVRGUIs[questionid];
+            console.log(gui);
+            
+            if (typeof gui === 'undefined')
+            {
+                return;
+            }
+            
+            let reasons = {
+                101: "Duplicate",
+                102: {
+                    2: "Belongs on another site",
+                    3: "Custom reason",
+                    4: "General computing hardware / software",
+                    7: "Professional server / networking administration",
+                    11: "Typo or Cannot Reproduce",
+                    13: "Debugging / No MCVE",
+                    16: "Request for Off-Site Resource",
+                },
+                103: "Unclear what you're asking",
+                104: "Too broad",
+                105: "Primarily opinion-based"
+            };
+            
+            if (nodes.textarea instanceof HTMLElement)
+            {
+                reasons[102][3] = nodes.textarea.value; 
+            }
+            console.log(reasons);
+            
+            let data = JSON.parse(xhr.responseText);
+            console.log(data);
+            
+            let reason = reasons[data.CloseReason];
+            console.log(reason);
+            
+            if (typeof data.CloseAsOffTopicReasonId !== 'undefined')
+            {
+                reason = reason[data.CloseAsOffTopicReasonId];
+            }
+            console.log(reason);
+            
+            gui.nodes.request.send(funcs.setStorage(questionid + '-reason', reason));
+        }
+    });
+})();
