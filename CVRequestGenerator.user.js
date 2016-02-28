@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           CV Request Generator
 // @namespace      https://github.com/SO-Close-Vote-Reviewers/
-// @version        2.0.0.0
+// @version        2.0.0.1
 // @description    This script generates formatted close vote requests and sends them to a specified chat room
 // @author         @TinyGiant
 // @include        /^https?:\/\/\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
@@ -329,9 +329,9 @@ class CVRGUI
         
         this.question.time = (() => 
         {
-            let time = scope.querySelector('.owner .relativetime');
+            let time = scope.querySelector('.post-signature:not([align="right"]) .relativetime');
             
-            if (time === null)
+            if (time !== null)
             {
                 return time.title;
             }
