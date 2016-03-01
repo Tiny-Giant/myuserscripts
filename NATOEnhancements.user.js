@@ -5,7 +5,7 @@
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
-// @grant        GM_addStyle
+// @grant        none
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
