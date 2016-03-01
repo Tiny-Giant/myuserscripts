@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.5
+// @version      1.0.0.6
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -51,17 +51,17 @@ const ScriptToInject = function()
         for (let post of posts)
         {
             // Get posts
-            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.question.id, html =>
+            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.questionid, html =>
             {
                 post.nodes.question.innerHTML = html;
             }));
-            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answer.id, html =>
+            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answerid, html =>
             {
                 post.nodes.answer.innerHTML = html;
             }));
 
             // Get votes
-            promises.push(funcs.fetch('/posts/' + post.question.id + '/votes', votes =>
+            promises.push(funcs.fetch('/posts/' + post.questionid + '/votes', votes =>
             {
                 votes = JSON.parse(votes);
 
@@ -88,7 +88,7 @@ const ScriptToInject = function()
             {
                 votesCast: postvotes,
                 canViewVoteCounts: true,
-                questionId: posts[0].question.id,
+                questionId: posts[0].questionid,
                 canOpenBounty: true
             });
 
@@ -101,7 +101,7 @@ const ScriptToInject = function()
 
             for (let post of posts)
             {
-                StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.question.id);
+                StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.questionid);
             }
 
             StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
@@ -159,16 +159,8 @@ const ScriptToInject = function()
 
             posts.push(
             {
-                answer:
-                {
-                    id: answerid,
-                    wrap: nodes.answer,
-                },
-                question:
-                {
-                    id: questionid,
-                    wrap: nodes.question,
-                },
+                answerid: answerid,
+                questionid: questionid,
                 nodes: nodes
             });
         }
