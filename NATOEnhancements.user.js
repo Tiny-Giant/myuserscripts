@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.4
+// @version      1.0.0.5
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
-// @grant        none
+// @grant        GM_addStyle
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
@@ -13,24 +13,7 @@
 
 const funcs = {};
 
-funcs.replacePost = (post, html) =>
-{
-    post.wrap.innerHTML = html;
-
-    const osnippets = post.snippets;
-    const nsnippets = Array.from(post.wrap.querySelectorAll('.snippet'));
-
-    while(nsnippets.length > 0 && osnippets.length > 0)
-    {
-        const nsnippet = nsnippets.shift();
-        const osnippet = osnippets.shift();
-
-        nsnippet.parentNode.insertBefore(osnippet, nsnippet);
-        nsnippet.parentNode.removeChild(nsnippet);
-    }
-};
-
-funcs.fetchVotes = (post, complete) => new Promise((resolve, reject) =>
+funcs.fetch = (url, complete) => new Promise((resolve, reject) =>
 {
     let xhr = new XMLHttpRequest();
 
@@ -43,32 +26,6 @@ funcs.fetchVotes = (post, complete) => new Promise((resolve, reject) =>
             return;
         }
 
-        if (typeof complete === 'function')
-        {
-            complete(JSON.parse(xhr.responseText));
-        }
-        
-        resolve(xhr);
-    }, false);
-
-    xhr.open('GET', '/posts/' + post.id + '/votes');
-
-    xhr.send();
-});
-
-funcs.fetchPost = (post, complete) => new Promise((resolve, reject) =>
-{   
-    let xhr = new XMLHttpRequest();
-
-    xhr.addEventListener('load', event =>
-    {
-        if (xhr.status !== 200)
-        {
-            console.error(xhr);
-            reject(xhr);
-            return;
-        }
-        
         if (typeof complete === 'function')
         {
             complete(xhr.responseText);
@@ -77,12 +34,12 @@ funcs.fetchPost = (post, complete) => new Promise((resolve, reject) =>
         resolve(xhr);
     }, false);
 
-    xhr.open('GET', '/posts/ajax-load-realtime/' + post.id);
+    xhr.open('GET', url);
 
     xhr.send();
 });
 
-funcs.fetchAllPosts = posts =>
+funcs.fetchPosts = posts =>
 {
     const promises = [];
     
@@ -91,25 +48,20 @@ funcs.fetchAllPosts = posts =>
     for(let post of posts)
     {
         // Get posts
-        promises.push(funcs.fetchPost(post.question, html => 
+        promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.question.id, html => 
         {
-            funcs.replacePost(post.question, html);
+            post.nodes.question.innerHTML = html;
         }));
-        promises.push(funcs.fetchPost(post.answer, html => 
+        promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answer.id, html => 
         {
-            funcs.replacePost(post.answer, html);
+            post.nodes.answer.innerHTML = html;
         }));
         
         // Get votes
-        promises.push(funcs.fetchVotes(post.question, votes =>
+        promises.push(funcs.fetch('/posts/' + post.question.id + '/votes', votes =>
         {
-            for(let post of votes)
-            {
-                postvotes.push(post);
-            }
-        }));
-        promises.push(funcs.fetchVotes(post.answer, votes =>
-        {
+            votes = JSON.parse(votes);
+            
             for(let post of votes)
             {
                 postvotes.push(post);
@@ -119,8 +71,6 @@ funcs.fetchAllPosts = posts =>
     
     Promise.all(promises).then(xhr =>
     {
-        console.log(xhr);
-        
         funcs.addCSS();
         
         for(let post of posts)
@@ -203,18 +153,14 @@ funcs.getPosts = () =>
         nodes.answer = document.createElement('div');
         nodes.wrap.appendChild(nodes.answer);
         
-        nodes.snippets = Array.from(nodes.old.answer.querySelectorAll('.snippet'));
-        
         posts.push({
             answer: {
                 id:   answerid,
                 wrap: nodes.answer,
-                snippets: []
             },
             question: {
                 id:   questionid,
                 wrap: nodes.question,
-                snippets: []
             },
             nodes: nodes
         });
@@ -260,7 +206,7 @@ funcs.init = () =>
     
     funcs.appendNodes(posts);
 
-    funcs.fetchAllPosts(posts);
+    funcs.fetchPosts(posts);
 };
 
 funcs.init();
