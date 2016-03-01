@@ -50,26 +50,29 @@ const ScriptToInject = function()
 
         for (let post of posts)
         {
-            // Get posts
-            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.questionid, html =>
-            {
-                post.nodes.question.innerHTML = html;
-            }));
-            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answerid, html =>
-            {
-                post.nodes.answer.innerHTML = html;
-            }));
-
-            // Get votes
-            promises.push(funcs.fetch('/posts/' + post.questionid + '/votes', votes =>
-            {
-                votes = JSON.parse(votes);
-
-                for (let post of votes)
+            // Blame Firefox's improper handling of let in for loops
+            (function(post){
+                // Get posts
+                promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.questionid, html =>
                 {
-                    postvotes.push(post);
-                }
-            }));
+                    post.nodes.question.innerHTML = html;
+                }));
+                promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answerid, html =>
+                {
+                    post.nodes.answer.innerHTML = html;
+                }));
+
+                // Get votes
+                promises.push(funcs.fetch('/posts/' + post.questionid + '/votes', votes =>
+                {
+                    votes = JSON.parse(votes);
+
+                    for (let post of votes)
+                    {
+                        postvotes.push(post);
+                    }
+                }));
+            })(post);
         }
 
         Promise.all(promises).then(xhr =>
