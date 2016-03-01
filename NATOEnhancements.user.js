@@ -5,208 +5,222 @@
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
-// @grant        GM_addStyle
+// @grant        none
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
 'use strict';
 
-const funcs = {};
-
-funcs.fetch = (url, complete) => new Promise((resolve, reject) =>
+const ScriptToInject = function()
 {
-    let xhr = new XMLHttpRequest();
+    'use strict';
+    const funcs = {};
 
-    xhr.addEventListener('load', event =>
+    funcs.fetch = (url, complete) => new Promise((resolve, reject) =>
     {
-        if (xhr.status !== 200)
-        {
-            console.error(xhr);
-            reject(xhr);
-            return;
-        }
+        let xhr = new XMLHttpRequest();
 
-        if (typeof complete === 'function')
+        xhr.addEventListener('load', event =>
         {
-            complete(xhr.responseText);
-        }
-        
-        resolve(xhr);
-    }, false);
-
-    xhr.open('GET', url);
-
-    xhr.send();
-});
-
-funcs.fetchPosts = posts =>
-{
-    const promises = [];
-    
-    const postvotes = [];
-    
-    for(let post of posts)
-    {
-        // Get posts
-        promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.question.id, html => 
-        {
-            post.nodes.question.innerHTML = html;
-        }));
-        promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answer.id, html => 
-        {
-            post.nodes.answer.innerHTML = html;
-        }));
-        
-        // Get votes
-        promises.push(funcs.fetch('/posts/' + post.question.id + '/votes', votes =>
-        {
-            votes = JSON.parse(votes);
-            
-            for(let post of votes)
+            if (xhr.status !== 200)
             {
-                postvotes.push(post);
+                console.error(xhr);
+                reject(xhr);
+                return;
             }
-        }));
-    }
-    
-    Promise.all(promises).then(xhr =>
+
+            if (typeof complete === 'function')
+            {
+                complete(xhr.responseText);
+            }
+
+            resolve(xhr);
+        }, false);
+
+        xhr.open('GET', url);
+
+        xhr.send();
+    });
+
+    funcs.fetchPosts = posts =>
     {
-        funcs.addCSS();
-        
-        for(let post of posts)
+        const promises = [];
+
+        const postvotes = [];
+
+        for (let post of posts)
         {
-            post.nodes.columns[0].innerHTML = '';
-            post.nodes.columns[1].innerHTML = '';
+            // Get posts
+            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.question.id, html =>
+            {
+                post.nodes.question.innerHTML = html;
+            }));
+            promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answer.id, html =>
+            {
+                post.nodes.answer.innerHTML = html;
+            }));
+
+            // Get votes
+            promises.push(funcs.fetch('/posts/' + post.question.id + '/votes', votes =>
+            {
+                votes = JSON.parse(votes);
+
+                for (let post of votes)
+                {
+                    postvotes.push(post);
+                }
+            }));
+        }
+
+        Promise.all(promises).then(xhr =>
+        {
+            funcs.addCSS();
+
+            for (let post of posts)
+            {
+                post.nodes.columns[0].innerHTML = '';
+                post.nodes.columns[1].innerHTML = '';
+                post.nodes.columns[0].appendChild(post.nodes.wrap);
+                post.nodes.wrap.style.display = '';
+            }
+
+            StackExchange.question.init(
+            {
+                votesCast: postvotes,
+                canViewVoteCounts: true,
+                questionId: posts[0].question.id,
+                canOpenBounty: true
+            });
+
+            const commentLinks = Array.from(document.querySelectorAll('.js-show-link.comments-link'));
+
+            for (let commentLink of commentLinks)
+            {
+                commentLink.click();
+            }
+
+            for (let post of posts)
+            {
+                StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.question.id);
+            }
+
+            StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
+        }, xhr =>
+        {
+            console.log('Failed', xhr);
+        });
+    };
+
+    funcs.appendNodes = posts =>
+    {
+        for (let post of posts)
+        {
             post.nodes.columns[0].appendChild(post.nodes.wrap);
-            post.nodes.wrap.style.display = '';
         }
-        
-        StackExchange.question.init({
-            votesCast: postvotes,
-            canViewVoteCounts: true,
-            questionId: posts[0].question.id,
-            canOpenBounty:true
-        });
-        
-        const commentLinks = Array.from(document.querySelectorAll('.js-show-link.comments-link'));
-        
-        for(let commentLink of commentLinks)
+    };
+
+    funcs.getPosts = () =>
+    {
+        const posts = [];
+        const rows = Array.from(document.querySelectorAll('.default-view-post-table > tbody > tr'));
+
+        for (let row of rows)
         {
-            commentLink.click();
+            const nodes = {};
+
+            nodes.scope = row;
+            nodes.columns = Array.from(nodes.scope.children);
+            nodes.wrap = document.createElement('div');
+            nodes.wrap.style.display = 'none';
+
+            nodes.old = {};
+
+            nodes.old.answer = nodes.scope.querySelector('.post-text');
+            nodes.old.title = nodes.scope.querySelector('.answer-hyperlink');
+
+            const urlsections = /(\d+)\/(.*?)\/(\d+)/.exec(nodes.old.title.href);
+            const questionid = urlsections[1];
+            const titleslug = urlsections[2];
+            const answerid = urlsections[3];
+
+            nodes.title = document.createElement('h1');
+            nodes.wrap.appendChild(nodes.title);
+
+            nodes.link = document.createElement('a');
+            nodes.link.href = window.location.protocol + '//' + window.location.host + '/questions/' + questionid + '/' + titleslug;
+            nodes.link.textContent = nodes.old.title.textContent;
+            nodes.title.appendChild(nodes.link);
+
+            nodes.question = document.createElement('div');
+            nodes.wrap.appendChild(nodes.question);
+
+            nodes.answer = document.createElement('div');
+            nodes.wrap.appendChild(nodes.answer);
+
+            posts.push(
+            {
+                answer:
+                {
+                    id: answerid,
+                    wrap: nodes.answer,
+                },
+                question:
+                {
+                    id: questionid,
+                    wrap: nodes.question,
+                },
+                nodes: nodes
+            });
         }
-        
-        for(let post of posts)
+
+        return posts;
+    };
+
+    funcs.addCSS = () =>
+    {
+        const CSS = [
+            '.question, .answer {',
+            '    width: 730px !important',
+            '}',
+            'h1, h2, h3, h4, h5, h6 {',
+            '    font-weight: normal',
+            '}',
+            '.answer {',
+            '    background: RGBA(255,153,0, 0.1);',
+            '    margin-top: 1em;',
+            '}'
+        ].join('\n');
+
+        const style = document.createElement('style');
+        document.body.appendChild(style);
+
+        const text = document.createTextNode(CSS);
+        style.appendChild(text);
+    }
+
+    funcs.init = () =>
+    {
+        const posts = funcs.getPosts();
+
+        const title = document.querySelector('.subheader h1');
+
+        StackExchange.helpers.addSpinner(title);
+
+        StackExchange.using("inlineEditing", () =>
         {
-            StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.question.id);
-        }
-        
-        StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
-    }, xhr =>
-    {
-        console.log('Failed', xhr);
-    });
-};
-
-funcs.appendNodes = posts =>
-{
-    for(let post of posts)
-    {
-        post.nodes.columns[0].appendChild(post.nodes.wrap);
-    }
-};
-
-funcs.getPosts = () =>
-{
-    const posts = [];
-    const rows = Array.from(document.querySelectorAll('.default-view-post-table > tbody > tr'));
-
-    for(let row of rows)
-    {
-        const nodes = {};
-        
-        nodes.scope = row;
-        nodes.columns = Array.from(nodes.scope.children);
-        nodes.wrap = document.createElement('div');
-        nodes.wrap.style.display = 'none';
-        
-        nodes.old = {};
-        
-        nodes.old.answer = nodes.scope.querySelector('.post-text');
-        nodes.old.title = nodes.scope.querySelector('.answer-hyperlink');
-        
-        const urlsections = /(\d+)\/(.*?)\/(\d+)/.exec(nodes.old.title.href);
-        const questionid = urlsections[1];
-        const titleslug = urlsections[2];
-        const answerid = urlsections[3];
-        
-        nodes.title = document.createElement('h1');
-        nodes.wrap.appendChild(nodes.title);
-        
-        nodes.link = document.createElement('a');
-        nodes.link.href = window.location.protocol + '//' + window.location.host + '/questions/' + questionid + '/' + titleslug;
-        nodes.link.textContent = nodes.old.title.textContent;
-        nodes.title.appendChild(nodes.link);
-        
-        nodes.question = document.createElement('div');
-        nodes.wrap.appendChild(nodes.question);
-        
-        nodes.answer = document.createElement('div');
-        nodes.wrap.appendChild(nodes.answer);
-        
-        posts.push({
-            answer: {
-                id:   answerid,
-                wrap: nodes.answer,
-            },
-            question: {
-                id:   questionid,
-                wrap: nodes.question,
-            },
-            nodes: nodes
+            StackExchange.inlineEditing.init();
         });
-    }
-    
-    return posts;
+
+        funcs.appendNodes(posts);
+
+        funcs.fetchPosts(posts);
+    };
+
+    funcs.init();
 };
 
-funcs.addCSS = () =>
-{
-    const CSS = [
-        '.question, .answer {',
-        '    width: 730px !important',
-        '}',
-        'h1, h2, h3, h4, h5, h6 {',
-        '    font-weight: normal',
-        '}',
-        '.answer {',
-        '    background: RGBA(255,153,0, 0.1);',
-        '    margin-top: 1em;',
-        '}'
-    ].join('\n');
+const ScriptToInjectNode = document.createElement('script');
+document.body.appendChild(ScriptToInjectNode);
 
-    const style = document.createElement('style');
-    document.body.appendChild(style);
-    
-    const text = document.createTextNode(CSS);
-    style.appendChild(text);
-}
-
-funcs.init = () =>
-{
-    const posts = funcs.getPosts();
-    
-    const title = document.querySelector('.subheader h1');
-    
-    StackExchange.helpers.addSpinner(title);
-
-    StackExchange.using("inlineEditing", () => 
-    {
-        StackExchange.inlineEditing.init();
-    });
-    
-    funcs.appendNodes(posts);
-
-    funcs.fetchPosts(posts);
-};
-
-funcs.init();
+const ScriptToInjectContent = document.createTextNode('(' + ScriptToInject.toString() + ')()');
+ScriptToInjectNode.appendChild(ScriptToInjectContent);
