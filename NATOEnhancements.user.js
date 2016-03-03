@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.6
+// @version      1.0.0.8
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -50,8 +50,9 @@ const ScriptToInject = function()
 
         for (let post of posts)
         {
-            // Blame Firefox's improper handling of let in for loops
-            (function(post){
+            // Firefox is a bitch, and doesn't handle let in for...of loops properly.
+            (function(post)
+            {
                 // Get posts
                 promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.questionid, html =>
                 {
@@ -107,6 +108,8 @@ const ScriptToInject = function()
                 StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.questionid);
             }
 
+            StackExchange.inlineTagEditing.init();
+            
             StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
         }, xhr =>
         {
@@ -204,6 +207,176 @@ const ScriptToInject = function()
         StackExchange.using("inlineEditing", () =>
         {
             StackExchange.inlineEditing.init();
+        });
+        
+        // This hack is to stop the inline tag editor from moving all tags on the page into the first question.
+        // Shog9 knows about this, but decided not to fix it because no one using the site normally will ever
+        // run into this problem. Thank the almighty Shog.
+        StackExchange.using("inlineTagEditing", () => 
+        {
+            StackExchange.inlineTagEditing = (function () {
+                var questions = $('div.question');
+                var inits = {};
+
+                questions.each(function(){
+                    var question = $(this);
+                    var jTagList;
+                    var jEditTagsLink;
+                    var jLinkWrapper;
+
+                    var questionId;
+                    var reviewTaskId;
+                    var jCurrentTagsBuffer = $("<div></div>");
+
+                    var bindWrapperHoverEvents = function () {
+                        jLinkWrapper
+                            .mouseover(function () { jEditTagsLink.show(); })
+                            .mouseout(function () { jEditTagsLink.hide(); });
+                    };
+
+                    var bindEditTagsLinkClick = function () {
+                        jEditTagsLink.unbind('click').one('click', function () {
+
+                            jLinkWrapper.fadeOut('fast', function () {
+                                // upon clicking "edit tags", save the current tags in case of cancel
+                                jLinkWrapper.appendTo(jCurrentTagsBuffer);
+
+                                // fetch our tag editor - will contain the latest tags, which could differ from what's loaded
+                                StackExchange.helpers.addSpinner(jTagList);
+                                $.ajax({
+                                    type: 'GET',
+                                    url: '/posts/' + questionId + '/edit-tags',
+                                    data: { reviewTaskId: reviewTaskId },
+                                    dataType: 'html',
+                                    success: fetchSuccess,
+                                    error: fetchError
+                                });
+                            });
+                        });
+                    };
+
+                    var restoreCurrentTags = function (immediately) {
+                        StackExchange.helpers.disableSubmitButton(jTagList);
+                        StackExchange.helpers.removeMessages();
+                        var doIt = function () {
+                            jTagList.empty();
+                            jLinkWrapper.appendTo(jTagList);
+                            jLinkWrapper.show().find('a#edit-tags').parent().hide();
+                            jTagList.fadeIn('fast');
+                            bindEditTagsLinkClick();
+                        };
+                        if (immediately)
+                            doIt();
+                        else
+                            jTagList.fadeOut('fast', doIt);
+                    };
+
+                    var fetchSuccess = function (html) {
+                        // TODO: we could fetch newer tags - update jCurrentTagsBuffer's tags with latest
+
+                        StackExchange.helpers.removeSpinner();
+
+                        // we'll hide the container, then show it via animation (JOY)
+                        var jHtml = $(html);
+
+                        // only fetch tageditor.js if the autocomplete plugin isn't available
+                        if (typeof $().autocomplete == 'function')
+                            jHtml = jHtml.not('script[src*="tageditor.js"]');
+
+                        var jForm = $('<form method="post" action="/posts/' + questionId + '/edit-tags"></form>');
+                        jTagList.css('display', 'none').append(jForm);
+                        jForm.append(jHtml);
+
+                        // add submit and cancel
+                        jTagList.find('div.form-item').append(
+                            '<div class="form-submit">' +
+                            '<input type="hidden" name="fkey" value="' + StackExchange.options.user.fkey + '" />' +
+                            '<input type="hidden" name="reviewTaskId" value="' + reviewTaskId + '" />' +
+                            $('<input>', { id: "edit-tags-submit", type: "submit", value: "Save Tag Edits", tabindex: "104" }).prop('outerHTML') +
+                            '<a id="edit-tags-cancel" class="cancel-edit" style="margin-left:8px;" href="#" tabindex="105">' + "cancel" + '</a>' +
+                            '</div>');
+
+                        StackExchange.using("postValidation", function () {
+                            StackExchange.postValidation.initOnBlurAndSubmit(jForm, 1, 'tags', false, function (data) {
+                                // server sends down the saved tags as they are first rendered on the page - replace buffered tags and show
+                                jLinkWrapper.find('a.post-tag').remove();
+                                jLinkWrapper.prepend(data.html);
+                                restoreCurrentTags();
+                                $(document).trigger('retag', questionId);
+                            });
+                        });
+
+                        jForm.find('.cancel-edit').click(function (e) {
+                            restoreCurrentTags();
+                            e.preventDefault();
+                        });
+
+                        jTagList.fadeIn('fast', function () {
+                            $('#tagnames').focus();
+                        });
+                    };
+
+                    var fetchError = function (response) {
+                        // undo our styling and show what happened
+                        StackExchange.helpers.removeSpinner();
+                        restoreCurrentTags();
+                        StackExchange.helpers.showErrorMessage(jLinkWrapper, (response.responseText && response.responseText.length < 300 ? response.responseText : "An error occurred when fetching the tag editor"));
+                    };
+
+                    // public methods
+                    inits[questionId] = {
+                        init: function () {
+                            if (StackExchange.disableInlineTagEdits) return;
+                            
+                            questionId = question.find('div.vote > input[type="hidden"]').val();
+                            jTagList = question.find('div.post-taglist');
+
+                            // wrap our tags in a span to ease hover show/hide
+                            jTagList.find('a.post-tag').wrapAll('<span class="edit-tags-wrapper"></span>');
+                            jLinkWrapper = jTagList.find('span.edit-tags-wrapper');
+
+                            // add an "edit tags" link upon hovering over tags
+                            jEditTagsLink = $('<span class="dno">' + $('<a>', { id: "edit-tags", style: "", title: "edit only this question's tags", text: "edit tags" }).prop('outerHTML') + '</span>');
+                            jLinkWrapper.append(jEditTagsLink);
+
+                            bindWrapperHoverEvents();
+                            bindEditTagsLinkClick();
+                        },
+
+                        initReviewRetag: function (currentReviewTaskId) {
+                            if (StackExchange.disableInlineTagEdits) return;
+                            
+                            questionId = question.find('div.vote > input[type="hidden"]').val();
+                            reviewTaskId = currentReviewTaskId;
+                            jTagList = question.find('div.post-taglist');
+
+                            // wrap our tags in a span to ease hover show/hide
+                            jTagList.find('a.post-tag').wrapAll('<span class="edit-tags-wrapper"></span>');
+                            jLinkWrapper = jTagList.find('span.edit-tags-wrapper');
+
+                            jEditTagsLink = $('.retag-question:first');
+                            jEditTagsLink.removeAttr('href');
+
+                            bindEditTagsLinkClick();
+                        }
+                    };
+                });
+                return {
+                    init: function () {
+                        for(var i in inits)
+                        {
+                            inits[i].init();
+                        }
+                    },
+
+                    initReviewRetag: function (currentReviewTaskId) {
+                        for(var i in inits)
+                        {
+                            inits[i].initReviewRetag();
+                        }
+                    }
+                }
+            })();
         });
 
         funcs.appendNodes(posts);
