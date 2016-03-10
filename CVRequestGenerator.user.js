@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name           CV Request Generator
 // @namespace      https://github.com/SO-Close-Vote-Reviewers/
-// @version        2.0.0.1
+// @version        2.0.0.2
 // @description    This script generates formatted close vote requests and sends them to a specified chat room
 // @author         @TinyGiant
-// @include        /^https?:\/\/\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
+// @include        /^https?:\/\/(?!chat)\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
 // @updateURL      https://github.com/Tiny-Giant/myuserscripts/raw/master/CVRequestGenerator.user.js
 // @grant          GM_xmlhttpRequest
 // @grant          GM_addStyle
@@ -18,7 +18,7 @@ const scriptVersion = GM_info.script.version;
 const scriptURL = GM_info.script.updateURL;
 const scriptVersionURL = 'https://github.com/Tiny-Giant/myuserscripts/raw/master/CVRequestGenerator.version';
 
-let css = [
+const CSS = [
     '.post-menu > span > a {',
     '    padding:0 3px 2px 3px;',
     '    color:#888;',
@@ -92,11 +92,11 @@ let css = [
     '}'
 ].join('\n');
 
-if (false);
-else if ("undefined" != typeof GM_addStyle)  GM_addStyle(css);
-else if ("undefined" != typeof PRO_addStyle) PRO_addStyle(css);
-else if ("undefined" != typeof addStyle)     addStyle(css);
-else (document.body || document.getElementsByTagName("body")[0]).appendChild(document.createElement("style").appendChild(document.createTextNode(css)).parentNode);
+const style = document.createElement('style');
+document.body.appendChild(style);
+
+const text = document.createTextNode(CSS);
+style.appendChild(text);
 
 if (!("StackExchange" in window))
 {
@@ -312,14 +312,9 @@ class CVRGUI
         {
             let title = document.querySelector('a[href*="questions/' + this.question.id + '"]');
             
-            if (title === null || /#/.test(title.href))
+            if (title === null)
             {
-                title = document.querySelector('a[href*="q/' + this.question.id + '"]');
-                
-                if (title === null || /#/.test(title.href))
-                {
-                    return 'Title not found';
-                }
+                return 'Title not found';
             }
             
             return title.textContent.replace(/\[(.*)\]/g, '($1)');
@@ -579,6 +574,7 @@ funcs.addXHRListener(xhr =>
                 return;
             }
 
+            nodes.checkbox.checked = false;
             nodes.votes.appendChild(nodes.label);
             
             nodes.textarea = nodes.popup.querySelector('textarea');
@@ -591,12 +587,6 @@ funcs.addXHRListener(xhr =>
     {
         if (/close\/add/.test(xhr.responseURL))
         {
-            console.log(nodes.checkbox.checked);
-            if (!nodes.checkbox.checked)
-            {
-                return;
-            }
-            
             let questionid = /\d+/.exec(xhr.responseURL);
             console.log(questionid);
             
@@ -623,9 +613,9 @@ funcs.addXHRListener(xhr =>
                     3: "Custom reason",
                     4: "General computing hardware / software",
                     7: "Professional server / networking administration",
-                    11: "Typo or Cannot Reproduce",
-                    13: "Debugging / No MCVE",
-                    16: "Request for Off-Site Resource",
+                    11: "Typographical error or cannot reproduce",
+                    13: "Debugging / no MCVE",
+                    16: "Request for off-site resource",
                 },
                 103: "Unclear what you're asking",
                 104: "Too broad",
@@ -648,9 +638,18 @@ funcs.addXHRListener(xhr =>
             {
                 reason = reason[data.CloseAsOffTopicReasonId];
             }
-            console.log(reason);
             
-            gui.nodes.request.send(funcs.setStorage(questionid + '-reason', reason));
+            if (/tools\/new-answers-old-questions/.test(window.location.href))
+            {
+                reason += ' (new activity)';
+            }
+
+            gui.nodes.request.input.value = reason;
+            
+            if (nodes.checkbox.checked)
+            {
+                gui.nodes.request.send(funcs.setStorage(questionid + '-reason', reason));
+            }
         }
     });
 })();
