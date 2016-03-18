@@ -62,7 +62,7 @@ else {
         deletevotes =            ['', +localStorage.SECUSTOMREVIEW_deletevotes][+!!localStorage.SECUSTOMREVIEW_deletevotes],
         reset, retrieve, getVotes, display, updatestats, logqueue;
 
-    document.querySelector('title').textContent = 'Review Close Votes - Magic™ Edition';
+    document.querySelector('title').textContent = 'Magic™ Tag Review';
 
     let nodes = {};
 
