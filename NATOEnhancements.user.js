@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NATO Enhancements
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.8
+// @version      1.0.0.9
 // @description  Includes the actual post on the new answers to old questions page of the 10k tools. 
 // @author       @TinyGiant
 // @include      /https?:\/\/(meta\.)?stackoverflow.com\/tools\/new-answers-old-questions.*/
@@ -9,6 +9,7 @@
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
+
 'use strict';
 
 const ScriptToInject = function()
@@ -24,17 +25,17 @@ const ScriptToInject = function()
         {
             if (xhr.status !== 200)
             {
-                console.error(xhr);
                 reject(xhr);
-                return;
-            }
-
-            if (typeof complete === 'function')
+            } 
+            else 
             {
-                complete(xhr.responseText);
-            }
+                if (typeof complete === 'function')
+                {
+                    complete(xhr.responseText);
+                }
 
-            resolve(xhr);
+                resolve(xhr);
+            }
         }, false);
 
         xhr.open('GET', url);
@@ -42,8 +43,82 @@ const ScriptToInject = function()
         xhr.send();
     });
 
+    funcs.chunkArray = (array, length) =>
+    {
+        // Check arguments for validity
+        if (!(array instanceof Array))
+        {
+            console.warn("chunkArray expects first argument to be an array, " + typeof(array) + " supplied");
+            return array;
+        }
+
+        if (typeof(length) !== 'number')
+        {
+            console.warn("chunkArray expects second argument to be a number, " + typeof(length) + " supplied");
+            return array;
+        }
+
+        // Create our new array
+        const chunked = Array(Math.ceil(array.length / length));
+
+        // Split the old array into chunks, then insert them into their positions in the new array
+        var i,j,temparray,chunk = 10;
+        for (let i = 0, j = array.length; i < j; i += length) {
+            chunked[i / length] = array.slice(i, i + length);
+        }
+
+        // Return the new array
+        return chunked;
+    };
+
+    funcs.iterateSlowly = (milliseconds, array, action, complete) => {
+        if (typeof(milliseconds) !== 'number')
+        {
+            console.warn("interateSlowly expects first argument to be a number, " + typeof(milliseconds) + " supplied");
+            return array;
+        }
+
+        if (!(array instanceof Array))
+        {
+            console.warn("interateSlowly expects second argument to be an array, " + typeof(array) + " supplied");
+            return array;
+        }
+
+        if (!(action instanceof Function))
+        {
+            console.warn("interateSlowly expects third argument to be a function, " + typeof(array) + " supplied");
+            return array;
+        }
+
+        if (complete !== undefined)
+        {
+            if (!(action instanceof Function))
+            {
+                console.warn("interateSlowly expects optional fourth argument to be a function, " + typeof(array) + " supplied");
+                return array;
+            }
+        }
+
+        if (!array.length)
+        {
+            return;
+        }
+
+        action(array.shift());
+
+        if (!array.length)
+        {
+            complete();
+            return;
+        }
+
+        setTimeout(funcs.iterateSlowly.bind(null, milliseconds, array, action, complete), milliseconds);
+    };
+
     funcs.fetchPosts = posts =>
     {
+        const fetches = [];
+
         const promises = [];
 
         const postvotes = [];
@@ -51,69 +126,87 @@ const ScriptToInject = function()
         for (let post of posts)
         {
             // Firefox is a bitch, and doesn't handle let in for...of loops properly.
-            (function(post)
+            (post =>
             {
-                // Get posts
-                promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.questionid, html =>
-                {
-                    post.nodes.question.innerHTML = html;
-                }));
-                promises.push(funcs.fetch('/posts/ajax-load-realtime/' + post.answerid, html =>
-                {
-                    post.nodes.answer.innerHTML = html;
-                }));
+                 // Get posts
+                fetches.push([
+                    '/posts/ajax-load-realtime/' + post.questionid, 
+                    html =>
+                    {
+                        post.nodes.question.innerHTML = html;
+                    }
+                ]);
+                fetches.push([
+                    '/posts/ajax-load-realtime/' + post.answerid, 
+                    html =>
+                    {
+                        post.nodes.answer.innerHTML = html;
+                    }
+                ]);
 
                 // Get votes
-                promises.push(funcs.fetch('/posts/' + post.questionid + '/votes', votes =>
-                {
-                    votes = JSON.parse(votes);
-
-                    for (let post of votes)
+                fetches.push([
+                    '/posts/' + post.questionid + '/votes', 
+                    votes =>
                     {
-                        postvotes.push(post);
+                        votes = JSON.parse(votes);
+
+                        for (let post of votes)
+                        {
+                            postvotes.push(post);
+                        }
                     }
-                }));
+                ]);
             })(post);
         }
 
-        Promise.all(promises).then(xhr =>
-        {
-            funcs.addCSS();
+        const fetchChunks = funcs.chunkArray(fetches, 20);
 
-            for (let post of posts)
+        funcs.iterateSlowly(1000, fetchChunks, fetches => { 
+            for(const fetch of fetches)
             {
-                post.nodes.columns[0].innerHTML = '';
-                post.nodes.columns[1].innerHTML = '';
-                post.nodes.columns[0].appendChild(post.nodes.wrap);
-                post.nodes.wrap.style.display = '';
+                promises.push(funcs.fetch(fetch[0], fetch[1]));
             }
-
-            StackExchange.question.init(
+        }, () => {
+            Promise.all(promises).then(xhr =>
             {
-                votesCast: postvotes,
-                canViewVoteCounts: true,
-                questionId: posts[0].questionid,
-                canOpenBounty: true
+                funcs.addCSS();
+
+                for (let post of posts)
+                {
+                    post.nodes.columns[0].innerHTML = '';
+                    post.nodes.columns[1].innerHTML = '';
+                    post.nodes.columns[0].appendChild(post.nodes.wrap);
+                    post.nodes.wrap.style.display = '';
+                }
+
+                StackExchange.question.init(
+                {
+                    votesCast: postvotes,
+                    canViewVoteCounts: true,
+                    questionId: posts[0].questionid,
+                    canOpenBounty: true
+                });
+
+                const commentLinks = Array.from(document.querySelectorAll('.js-show-link.comments-link'));
+
+                for (let commentLink of commentLinks)
+                {
+                    commentLink.click();
+                }
+
+                for (let post of posts)
+                {
+                    StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.questionid);
+                }
+
+                StackExchange.inlineTagEditing.init();
+                
+                StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
+            }, xhr =>
+            {
+                console.log('Failed', xhr);
             });
-
-            const commentLinks = Array.from(document.querySelectorAll('.js-show-link.comments-link'));
-
-            for (let commentLink of commentLinks)
-            {
-                commentLink.click();
-            }
-
-            for (let post of posts)
-            {
-                StackExchange.realtime.subscribeToQuestion(StackExchange.options.site.id, post.questionid);
-            }
-
-            StackExchange.inlineTagEditing.init();
-            
-            StackExchange.helpers.removeSpinner(document.querySelector('.subheader h1'));
-        }, xhr =>
-        {
-            console.log('Failed', xhr);
         });
     };
 
@@ -194,7 +287,7 @@ const ScriptToInject = function()
 
         const text = document.createTextNode(CSS);
         style.appendChild(text);
-    }
+    };
 
     funcs.init = () =>
     {
@@ -375,7 +468,7 @@ const ScriptToInject = function()
                             inits[i].initReviewRetag();
                         }
                     }
-                }
+                };
             })();
         });
 
