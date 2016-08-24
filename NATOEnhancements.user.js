@@ -10,11 +10,14 @@
 /* jshint -W097 */
 /* jshint esnext: true */
 
+console.log('running');
+
 'use strict';
 
 const ScriptToInject = function()
 {
     'use strict';
+    console.log('injected');
     const funcs = {};
 
     funcs.fetch = (url, complete) => new Promise((resolve, reject) =>
@@ -62,7 +65,6 @@ const ScriptToInject = function()
         const chunked = Array(Math.ceil(array.length / length));
 
         // Split the old array into chunks, then insert them into their positions in the new array
-        var i,j,temparray,chunk = 10;
         for (let i = 0, j = array.length; i < j; i += length) {
             chunked[i / length] = array.slice(i, i + length);
         }
@@ -163,7 +165,7 @@ const ScriptToInject = function()
         const fetchChunks = funcs.chunkArray(fetches, 20);
 
         funcs.iterateSlowly(1000, fetchChunks, fetches => { 
-            for(const fetch of fetches)
+            for(let fetch of fetches)
             {
                 promises.push(funcs.fetch(fetch[0], fetch[1]));
             }
