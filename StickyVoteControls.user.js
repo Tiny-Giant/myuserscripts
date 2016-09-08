@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sticky vote controls
 // @namespace    http://github.com/TinyGiant/
-// @version      1.0.0.2
+// @version      1.0.0.3
 // @description  Brings back the experimental sticky vote controls.
 // @author       @TinyGiant
 // @include      /^https?://(?!chat)\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/.*/
@@ -24,17 +24,16 @@
             open.apply(this, arguments);
         };
     };
-    
-    funcs.run = () => {
-        const votes = $('.vote:not(.sticky)');
-        const cells = $('.votecell:not(.sticky)');
 
-        votes.css({'position':'absolute', 'z-index':'100'});
-        cells.css({'width':'46px'});
+    funcs.run = () => {
+        const votes = $('.question .vote:not(.sticky), .answer .vote:not(.sticky)');
+        const cells = $('.question .votecell:not(.sticky), .answer .votecell:not(.sticky)');
+
+        votes.css({'position':'absolute', 'z-index':'100'}).addClass('sticky');
+        cells.css({'width':'46px'}).addClass('sticky');
 
         votes.each(function(i,el){
             el = $(el);
-            el.addClass('sticky');
             var postheight = el.parent().next().find('.post-text').height();
             if(el.height() >= postheight) return;
             var parent = el.parent();
