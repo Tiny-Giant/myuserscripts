@@ -15,7 +15,10 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   right: 100%;
   display: none;
-  padding-right: 20px;
+  padding: 5px;
+  margin-right: 5px;
+  background: #444;
+  border-radius: 5px;
 }
 
 h1:hover .permalink, 
@@ -189,28 +192,7 @@ hr {
   margin-top: 1em;
   margin-bottom: 1em;
   border: 0;
-  border-top: solid 1px #ddd;
-}
-
-table {
-  width: 100%;
-  border: 1px solid #ebebeb;
-}
-
-th {
-  font-weight: 500;
-}
-
-td {
-  font-weight: 300;
-  text-align: center;
-  border: 1px solid #ebebeb;
-}
-
-form {
-  padding: 20px;
-  background: #f2f2f2;
-
+  border-top: solid 1px #888;
 }
 
 
@@ -222,10 +204,6 @@ p {
 
 a {
   text-decoration: none;
-}
-
-p a {
-  font-weight: 400;
 }
 
 blockquote {
@@ -289,7 +267,9 @@ footer a:hover {
 
 /* Tablet Portrait size to standard 960 (devices and browsers) */
 @media only screen and (min-width: 768px) and (max-width: 959px) {
-  .inner {
+  #content-wrapper,
+  .heading,
+  .subheading {
     width: 740px;
   }
   header h1, header h2 {
@@ -304,21 +284,13 @@ footer a:hover {
   #main-content {
     width: 490px;
   }
-  #main-content h1:before,
-  #main-content h2:before,
-  #main-content h3:before,
-  #main-content h4:before,
-  #main-content h5:before,
-  #main-content h6:before {
-    padding-right: 0;
-    margin-left: 0;
-    content: none;
-  }
 }
 
 /* All Mobile Sizes (devices and browser) */
 @media only screen and (max-width: 767px) {
-  .inner {
+  #content-wrapper,
+  .heading,
+  .subheading {
     width: 93%;
   }
   header {
@@ -327,13 +299,14 @@ footer a:hover {
   header .inner {
     position: relative;
   }
-  header h1, header h2 {
+  .subheading,
+  .heading {
     width: 100%;
   }
   header h1 {
     font-size: 48px;
   }
-  header h2 {
+  header .subheading {
     font-size: 24px;
   }
   header a.button {
@@ -358,29 +331,19 @@ footer a:hover {
     font-size: 13px;
   }
   #main-content,
-  aside#sidebar {
+  #sidebar {
     float: none;
     width: 100% ! important;
   }
-  aside#sidebar {
+  #sidebar {
     min-height: 0;
     padding: 20px 0;
     margin-top: 20px;
     background-image: none;
     border-top: solid 1px #ddd;
   }
-  aside#sidebar a.button {
+  #sidebar a.button {
     display: none;
-  }
-  #main-content h1:before,
-  #main-content h2:before,
-  #main-content h3:before,
-  #main-content h4:before,
-  #main-content h5:before,
-  #main-content h6:before {
-    padding-right: 0;
-    margin-left: 0;
-    content: none;
   }
 }
 
