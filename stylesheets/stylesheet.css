@@ -58,6 +58,8 @@ header.subheading {
 }
 
 #content-wrapper {
+  width: 1000px;
+  margin: 0 auto;
   padding-top: 30px;
   background: rgba(100,100,100,0.3);
 }
