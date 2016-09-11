@@ -31,7 +31,8 @@ header {
 }
 
 header.heading,
-header.subheading {
+header.subheading,
+.inner {
   position: relative;
   width: 1000px;
   margin: 0 auto;
