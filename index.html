@@ -1,46 +1,150 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width">
-        <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
-        <title>title</title>
-        <style>
-            html, body {
-                height: 100%;
-                margin: 0;
-                line-height: 100vh;
-                font-family: 'Open Sans', sans-serif;
-                color: #444;
-            }
-            .hero-outer {
-                display: inline-block;
-                width: 100%;
-                line-height: 1.5em;
-                vertical-align: middle;
-            }
-            .hero-inner {
-                margin: 0 auto;
-                display: block;
-                max-width: min-content;
-                padding: 0 20vw 0 0;
-                white-space: nowrap;
-            }
-            h1 {
-                font-size: 50pt;
-                margin: 0;
-            }
-            small {
-                padding: 0 0 0 5px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="hero-outer">
-            <div class="hero-inner">
-                <h1>Hello World!</h1><br>
-                <small>This page is coming soon</small>
-            </div>
-        </div>
-    </body>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>My User Scripts by Tiny-Giant</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>My User Scripts</h1>
+        <h2>Caution: May contain Magic™</h2>
+        <a href="https://github.com/Tiny-Giant/myuserscripts" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h2>
+<a id="debugging" class="anchor" href="#debugging" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Debugging</h2>
+
+<h3>
+<a id="ajax-listener" class="anchor" href="#ajax-listener" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/AJAXListener.user.js">AJAX Listener</a>
+</h3>
+
+<p>A simple AJAX listener that intercepts all AJAX requests made on a page and logs them to the console for review.</p>
+
+<h3>
+<a id="enable-logging" class="anchor" href="#enable-logging" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/EnableLogging.user.js">Enable Logging</a>
+</h3>
+
+<p>Enables Stack Overflow's built in logging / debugging system.</p>
+
+<h2>
+<a id="chat" class="anchor" href="#chat" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Chat</h2>
+
+<h3>
+<a id="moderation-request-archiver" class="anchor" href="#moderation-request-archiver" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/CVRequestArchiver.user.js">Moderation Request Archiver</a>
+</h3>
+
+<p>Provides an interface to archive formatted moderation requests in a given chat room. Must be a room owner or moderator of the current room for the interface to show up. This is an old version, the <a href="https://github.com/SO-Close-Vote-Reviewers/UserScripts/blob/master/CVRequestArchiver.user.js">newest version</a> is being maintained by the <a href="https://github.com/SO-Close-Vote-Reviewers">SOCVR</a> More information to come.</p>
+
+<h3>
+<a id="moderation-request-generator" class="anchor" href="#moderation-request-generator" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/CVRequestGenerator.user.js">Moderation Request Generator</a>
+</h3>
+
+<p>Provides an interface to automate the formatting and sending of moderation requests from chat to a given chat room. Currently only works for close vote requests. More information to come.</p>
+
+<h3>
+<a id="trainwreck" class="anchor" href="#trainwreck" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/Trainwreck.user.js">Trainwreck</a>
+</h3>
+
+<p>Provides an interface to automate the formatting and sending of a message to the current chat room. Format is <code>[#RekdTrain](link to random image of trainwreck)</code>. More information to come.</p>
+
+<h2>
+<a id="main-site" class="anchor" href="#main-site" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Main Site</h2>
+
+<h3>
+<a id="inline-editing-everywhere" class="anchor" href="#inline-editing-everywhere" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/InlineEditingEverywhere.user.js">Inline Editing Everywhere</a>
+</h3>
+
+<p>Enables inline editing even if you don't have the inline editing privilege on a given site. Edits must still go through review if you don't have the editing privilege. More information to come.</p>
+
+<h3>
+<a id="sticky-vote-controls" class="anchor" href="#sticky-vote-controls" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/StickyVoteControls.user.js">Sticky Vote Controls</a>
+</h3>
+
+<p>Voting controls stick to the top of the page when scrolling down a long post. More information to come.</p>
+
+<h2>
+<a id="review" class="anchor" href="#review" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Review</h2>
+
+<h3>
+<a id="magic-tag-review" class="anchor" href="#magic-tag-review" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/MagicTagReview.user.js">Magic Tag Review</a>
+</h3>
+
+<p>Provides a new review interface for reviewing questions in a specific tag based on close or delete votes. A new section is provided one the /review page. This will continue to exist but is going to be superseded by the new Magic Review Tool which will have many more features. More information to come.</p>
+
+<h3>
+<a id="nato-enhancements" class="anchor" href="#nato-enhancements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/NATOEnhancements.user.js">NATO Enhancements</a>
+</h3>
+
+<p>Loads the full post and question as they would be seen in the wild with all controls enabled. More information to come.</p>
+
+<h3>
+<a id="nato-hide-questions" class="anchor" href="#nato-hide-questions" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/NATOHideQuestions.user.js">NATO Hide Questions</a>
+</h3>
+
+<p>Hides the questions loaded by the NATO Enhancements script, this will eventually be merged as an option into the NATO Enhancements script. </p>
+
+<h3>
+<a id="review-enhancements" class="anchor" href="#review-enhancements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/ReviewEnhancements.user.js">Review Enhancements</a>
+</h3>
+
+<p>Loads all posts as they would be seen in the wild with all controls enabled while in review. More information to come.</p>
+
+<h3>
+<a id="votes-page-enhancements" class="anchor" href="#votes-page-enhancements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/VotesPageEnhancements.user.js">Votes Page Enhancements</a>
+</h3>
+
+<p>Loads posts as they would be seen in the wild with all controls enabled on your votes page. Useful for reviewing posts that you have voted on.</p>
+
+<h3>
+<a id="thing-checker" class="anchor" href="#thing-checker" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/ThingChecker.user.js">Thing Checker</a>
+</h3>
+
+<p>A proof of concept audit detection script which intercepts the review AJAX requests and looks for the <code>isAudit</code> property of the returned JSON object. This is not intended to be used. If you use it, you run the risk of being manually review banned. A better option is to review to the best of your ability and report any bad audits on meta. A review ban incurred by multiple bad audits can be lifted by moderators if the bad audits are indeed bad audits.</p>
+
+<h2>
+<a id="styling" class="anchor" href="#styling" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Styling</h2>
+
+<h3>
+<a id="so-dark" class="anchor" href="#so-dark" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a><a href="https://github.com/Tiny-Giant/myuserscripts/blob/master/SODark.user.js">SO Dark</a>
+</h3>
+
+<p>This is really buggy right now, best to just not use this yet.</p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/Tiny-Giant/myuserscripts/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/Tiny-Giant/myuserscripts/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/Tiny-Giant/myuserscripts"></a> is maintained by <a href="https://github.com/Tiny-Giant">Tiny-Giant</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
 </html>
