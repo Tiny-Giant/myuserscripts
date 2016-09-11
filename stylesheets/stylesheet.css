@@ -60,7 +60,7 @@ header.subheading {
   position: relative;
   width: 1000px;
   margin: 0 auto;
-  padding-top: 30px;
+  padding: 20px;
   background: rgba(100,100,100,0.3);
 }
 
@@ -75,8 +75,7 @@ header.subheading {
 
 aside#sidebar {
   float: right;
-  width: 220px;
-  padding-left: 20px;
+  width: 200px;
   min-height: 504px;
   padding-left: 20px;
   font-size: 12px;
