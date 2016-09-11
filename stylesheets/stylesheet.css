@@ -15,6 +15,7 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   right: 100%;
   display: none;
+  padding-right: 20px;
 }
 
 h1:hover .permalink, 
@@ -47,8 +48,8 @@ header {
   padding-top: 40px;
   padding-bottom: 40px;
   color: #CFCFCF;
-  background: rgba(100,100,100,0.3);
-  border-bottom: solid 1px rgba(100,100,100,0.6);
+  background: #444);
+  border-bottom: solid 1px #222;
 }
 
 .heading,
