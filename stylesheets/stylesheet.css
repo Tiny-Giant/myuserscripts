@@ -91,6 +91,18 @@ header.subheading {
   width: 700px;
 }
 
+#main-content section {
+  padding-left: 10px;
+}
+
+#main-content section h2 {
+  margin-left: -10px;
+}
+
+#main-content section p {
+  padding-left: 10px;
+}
+
 #main-content img {
   max-width: 100%;
 }
