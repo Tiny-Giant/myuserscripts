@@ -15,7 +15,7 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   right: 100%;
   display: none;
-  padding: 5px 10px;
+  padding: 5px 10px 2px 10px;
   top: -5px;
   background: #444;
   border-radius: 5px;
@@ -91,6 +91,11 @@ header.subheading {
 #main-content {
   float: left;
   width: 700px;
+}
+
+#main-content section h2 {
+  padding-left: 10px;
+  margin-left: -10px;
 }
 
 #main-content section h3 {
