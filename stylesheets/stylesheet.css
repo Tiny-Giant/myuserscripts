@@ -145,8 +145,8 @@ h1 {
  */
 
 mark {
-  color: #000;
-  background: #ff0;
+  color: #FFF;
+  background: #00F;
 }
 
 /**
@@ -434,7 +434,7 @@ body {
   font-size: 15px;
   font-weight: 400;
   line-height: 1.5;
-  color: #666;
+  color: #EEE;
 }
 
 p {
@@ -442,15 +442,16 @@ p {
 }
 
 a {
-  color: #2879d0;
+  color: #E2DE84;
 }
 a:hover {
-  color: #2268b2;
+  color: #ECFEAA;
 }
 
 header {
   padding-top: 40px;
   padding-bottom: 40px;
+  color: #CFCFCF;
   background: rgba(100,100,100,0.3);
   border-bottom: solid 1px rgba(100,100,100,0.6);
 }
