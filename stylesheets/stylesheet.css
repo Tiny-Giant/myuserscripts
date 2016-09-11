@@ -38,10 +38,6 @@ header {
   margin: 0 auto;
 }
 
-.inner {
-  background: rgba(100,100,100,0.3);
-}
-
 .heading {
   line-height: 40pt;
 }
@@ -63,7 +59,7 @@ header.subheading {
 
 #content-wrapper {
   padding-top: 30px;
-  border-top: solid 1px #fff;
+  background: rgba(100,100,100,0.3);
 }
 
 #main-content {
