@@ -30,8 +30,8 @@ header {
   border-bottom: solid 1px rgba(100,100,100,0.6);
 }
 
-header.heading,
-header.subheading,
+header .heading,
+header .subheading,
 .inner {
   position: relative;
   width: 1000px;
