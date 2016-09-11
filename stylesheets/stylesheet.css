@@ -15,7 +15,7 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   right: 100%;
   display: none;
-  padding: 5px;
+  padding: 5px 10px;
   top: -5px;
   background: #444;
   border-radius: 5px;
@@ -93,16 +93,12 @@ header.subheading {
   width: 700px;
 }
 
-#main-content section {
+#main-content section h3 {
   padding-left: 10px;
-}
-
-#main-content section h2 {
-  margin-left: -10px;
 }
 
 #main-content section p {
-  padding-left: 10px;
+  padding-left: 20px;
 }
 
 #main-content img {
