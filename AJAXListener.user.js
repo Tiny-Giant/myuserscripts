@@ -1,16 +1,25 @@
 // ==UserScript==
 // @name         AJAX Listener
-// @namespace    https://github.com/Tiny-Giant/
-// @version      1.0.0.2
-// @description  This logs the results of any AJAX requests made to the console. 
+// @namespace    http://tiny-giant.github.io/myuserscripts
+// @version      2.0.0.0
+// @description  Intercepts and logs all AJAX requests
 // @author       @TinyGiant
 // @include      /https?:\/\/\w*.?stackoverflow.com/.*/
 // @grant        none
 // ==/UserScript==
-/* jshint -W097 */
-'use strict';
+/* jshint esnext: true */
 
-$(document).ajaxComplete((event, request, settings) => {
-    console.log(event, request, settings);
-    console.log('\n');
-});
+const funcs = {};
+
+funcs.addXHRListener = callback =>
+{
+    let open = XMLHttpRequest.prototype.open;
+
+    XMLHttpRequest.prototype.open = function() 
+    {
+        this.addEventListener('load', callback.bind(null, this), false);
+        open.apply(this, arguments);
+    };
+};
+
+funcs.addXHRListener(self => console.log(self));
