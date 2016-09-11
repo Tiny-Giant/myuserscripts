@@ -86,16 +86,16 @@ header.subheading {
   background: rgba(100,100,100,0.3);
 }
 
-#main-content {
+column#main-content {
   float: left;
   width: 700px;
 }
 
-#main-content img {
+column#main-content img {
   max-width: 100%;
 }
 
-aside#sidebar {
+column#sidebar {
   float: right;
   width: 200px;
   min-height: 504px;
@@ -104,8 +104,8 @@ aside#sidebar {
   line-height: 1.3;
 }
 
-aside#sidebar p.repo-owner,
-aside#sidebar p.repo-owner a {
+column#sidebar p.repo-owner,
+column#sidebar p.repo-owner a {
   font-weight: bold;
 }
 
