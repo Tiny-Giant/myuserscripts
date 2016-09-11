@@ -30,15 +30,15 @@ header {
   border-bottom: solid 1px rgba(100,100,100,0.6);
 }
 
-header .heading,
-header .subheading,
+.heading,
+.subheading,
 .inner {
   position: relative;
   width: 1000px;
   margin: 0 auto;
 }
 
-header.heading {
+.heading {
   line-height: 40pt;
 }
 
