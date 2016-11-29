@@ -65,12 +65,8 @@ CHAT.Hub.roomReady = {
         }
 
         function handleLoadedEvents(handler) {
-            const containers = [...(document.querySelectorAll('.user-container') || [])];
-
-            containers.forEach(container => {
-                const messages = [...(container.querySelectorAll('.message') || [])];
-
-                messages.forEach(message => handler({
+            [...(document.querySelectorAll('.user-container') || [])].forEach(container => {
+                [...(container.querySelectorAll('.message') || [])].forEach(message => handler({
                     room_id: CHAT.CURRENT_ROOM_ID,
                     event_type: 1,
                     user_id: +(container.className.match(/user-(\d+)/) || [])[1],
