@@ -1,14 +1,14 @@
 // ==UserScript==
-// @name        NATOBot Controls
+// @name        Natty Controls
 // @namespace   http://tinygiant.io
-// @description Adds quick links for [tp|fp|ne] to NATOBot reports.
+// @description Adds quick links for [tp|fp|ne] to Natty reports.
 // @include     http*://chat.stackoverflow.com/rooms/111347/sobotics
-// @version     1.0.0.1
+// @version     1.0.1
 // @grant       none
 // ==/UserScript==
 /* jshint esnext: true */
 
-function NATOBotControls() {
+function NattyControls() {
     const ready = CHAT.Hub.roomReady;
 
     CHAT.Hub.roomReady = {
@@ -23,7 +23,7 @@ function NATOBotControls() {
                 const content = document.createElement('div');
                 content.innerHTML = event.content;
 
-                if(!/^\[ NATOBot/.test(content.textContent.trim())) return; // event is not a report
+                if(!/^\[ Natty/.test(content.textContent.trim())) return; // event is not a report
 
                 function send(message) {
                     $.ajax({
@@ -85,6 +85,6 @@ function NATOBotControls() {
 }
 
 const script = document.createElement('script');
-script.textContent = `(${ NATOBotControls.toString() })();`;
+script.textContent = `(${ NattyControls.toString() })();`;
 console.log(script.textContent);
 document.body.appendChild(script);
