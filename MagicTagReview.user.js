@@ -1,11 +1,10 @@
 // ==UserScript==
 // @name         Magic™ Tag Review
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.3
+// @version      1.0.0.4
 // @description  Creates a fake queue which allows you to search a tag by a minimum number close votes or delete votes.
 // @author       @TinyGiant
-// @match        http://stackoverflow.com/review/custom*
-// @match        http://stackoverflow.com/review
+// @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -211,7 +210,7 @@ else {
             window.setTimeout(retrieve.bind(null, tagged, callback), response.backoff * 1000);
         });
 
-        let url = 'http://api.stackexchange.com/2.2/questions?';
+        let url = location.protocol + '//api.stackexchange.com/2.2/questions?';
 
         localStorage.SECUSTOMREVIEW_page = ++page;
 
