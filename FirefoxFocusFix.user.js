@@ -13,7 +13,7 @@ document.body.appendChild(document.createElement('script')).textContent = `(func
     
     HTMLElement.prototype.focus = function() {
         oldfocus.call(this);
-        if(this.selectionEnd === this.selectionStart)
+        if (this.selectionEnd === this.selectionStart)
             this.selectionEnd = 0;
     };
 })()`;
