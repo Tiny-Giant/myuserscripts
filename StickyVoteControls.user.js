@@ -1,49 +1,22 @@
 // ==UserScript==
 // @name         Sticky vote controls
 // @namespace    http://github.com/TinyGiant/
-// @version      1.0.0.3
-// @description  Brings back the experimental sticky vote controls.
+// @version      1.0.0.4
+// @description  Makes the vote controls sticky
 // @author       @TinyGiant
-// @include      /^https?://(?!chat)\w*.?(stackoverflow|stackexchange|serverfault|superuser|askubuntu|stackapps)\.com/.*/
+// @include      /^https?:\/\/(?!chat)\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
 // @grant        none
 // ==/UserScript==
 /* jshint esnext: true */
+/* jshint -w097 */
+'use strict';
 
-(function(){
-    "use strict";
-
-    const funcs = {};
-
-    funcs.addXHRListener = callback =>
-    {
-        let open = XMLHttpRequest.prototype.open;
-
-        XMLHttpRequest.prototype.open = function()
-        {
-            this.addEventListener('load', callback.bind(null, this), false);
-            open.apply(this, arguments);
-        };
-    };
-
-    funcs.run = () => {
-        const votes = $('.question .vote:not(.sticky), .answer .vote:not(.sticky)');
-        const cells = $('.question .votecell:not(.sticky), .answer .votecell:not(.sticky)');
-
-        votes.css({'position':'absolute', 'z-index':'100'}).addClass('sticky');
-        cells.css({'width':'46px'}).addClass('sticky');
-
-        votes.each(function(i,el){
-            el = $(el);
-            var postheight = el.parent().next().find('.post-text').height();
-            if(el.height() >= postheight) return;
-            var parent = el.parent();
-            $(document).scroll(window.requestAnimationFrame.bind(null,function() {
-                if(document.body.scrollTop > parent.offset().top) document.body.scrollTop < parent.offset().top + parent.height() - el.height() && el.css({'top':document.body.scrollTop}); else el.css({'top':''});
-            }));
-        });
-    };
-
-    funcs.run();
-
-    funcs.addXHRListener(funcs.run);
-})();
+document.body.insertAdjacentHTML("beforeend", `
+    <style type="text/css">
+        .question .vote,
+        .answer .vote {
+           position: sticky;
+           top: 0px;
+        }
+    </style>
+`);
