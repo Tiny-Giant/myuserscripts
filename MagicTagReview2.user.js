@@ -1,24 +1,28 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.0
+// @version      1.0.0.1
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
 // @grant        unsafeWindow
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @run-at       document-idle
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
-/* globals unsafeWindow, $ */
+/* globals unsafeWindow, $, GM_setValue, GM_getValue */
 (async _ => {
     'use strict';
-
-    let StackExchange = window.StackExchange;
-
-    if (typeof StackExchange === 'undefined') {
-        StackExchange = unsafeWindow.StackExchange;
-    }
+    
+    const StackExchange = (_ => {
+        if ("StackExchange" in window)
+            return window.StackExchange;
+        if ("StackExchange" in unsafeWindow)
+            return unsafeWindow.StackExchange;
+        else return false;
+    })();
 
     StackExchange.using('inlineEditing', function () {
         StackExchange.inlineEditing.init();
@@ -42,9 +46,9 @@
         // We are on the Magic™ Tag Review page
         document.querySelector('title').textContent = 'Magic™ Tag Review';
 
-        const store = new Proxy(localStorage, {
-            get: (t, k) => t.getItem(`MagicTagReview-${ k }`),
-            set: (t, k, v) => (t.setItem(`MagicTagReview-${ k }`, v), true)
+        const store = new Proxy({}, {
+            get: (t, k) => GM_getValue(`MagicTagReview-${ k }`),
+            set: (t, k, v) => (GM_setValue(`MagicTagReview-${ k }`, v), true)
         });
 
         const nodes = (_ => {
@@ -127,6 +131,8 @@
                             <input class="review-closevotes" type="text" placeholder="minimum close votes">
                             <input class="review-deletevotes" type="text" placeholder="minimum delete votes">
                             <input class="review-button" type="submit" value="Go">
+                            <input class="review-stop" type="button" value="Stop">
+                            <input class="review-refresh" type="submit" value="Refresh">
                         </form>
                         <input class="review-prev" type="button" value="Previous">
                         <input class="review-next" type="button" value="Next">
@@ -195,37 +201,39 @@
             nodes.question.innerHTML    = '';
             nodes.title.href            = '';
             nodes.title.innerHTML       = '';
+            nodes.stop.disabled         = true;
             nodes.prev.disabled         = true;
             nodes.next.disabled         = true;
             nodes.indicator.textContent = '';
         };
+        
+        let stop = false;
+        
+        nodes.stop.addEventListener('click', _ => stop = true);
 
         const retrieve = tagged => new Promise(async (resolve, reject) => {
             reset(1,0,1);
+            
+            nodes.stop.disabled = false;
 
-            let has_more = true, page = 1, quota_remaining, backoff, totalpages = 1;
+            const result = { quota_remaining: 1, backoff: undefined };
+
+            let page = 1, totalpages = 1, url;
         
             nodes.spinner.show();
         
-            while(page <= totalpages && quota_remaining !== 0 && !backoff) {
+            while(page <= totalpages && result.quota_remaining !== 0 && !result.backoff && stop === false) {
                 nodes.indicator.textContent = 'Retrieving question list (page ' + page + ' of ' + (totalpages||0)  + ')';
-                let url = location.protocol + '//api.stackexchange.com/2.2/questions?';
-          
-                let options = [
+                url = location.protocol + '//api.stackexchange.com/2.2/questions?' + [
                     'page=' + page++,
                     'pagesize=100',
                     'order=asc',
                     'sort=votes',
                     'site=' + /\/([\w.]*)\.com/.exec(location.href)[1],
                     'key=dwtLmAaEXumZlC5Nj0vDuw((',
-                    'filter=!SCa2InlXKTAFy(yEGCWMq7)MbsaOzCKU5SPM.Nf9p6Jpg3tQ5zp_NbiPkjGOEHrn'
-                ];
-
-                if (tagged) {
-                    options.unshift('tagged=' + encodeURIComponent(tagged));
-                }
-
-                url += options.join('&');
+                    'filter=!m)BxSjkODD1qUae7JH1Ff5WcCKJJMTiHQO5fpin72FE2B_6YEmt(kALb',
+                    'tagged=' + encodeURIComponent(tagged)
+                ].join('&');
                 
                 const response = await fetch(url);
                 
@@ -233,30 +241,32 @@
                     return reject(response);
                 }
                 
-                const result = await response.json();
+                Object.assign(result, await response.json());
                 
-                has_more = result.has_more;
-                quota_remaining = result.quota_remaining;
-                backoff = result.backoff;
                 totalpages = Math.ceil(result.total / 100);
                 
                 question_list.push(...result.items);
-                store.question_list = JSON.stringify(question_list);
                 
-                if(backoff) console.log('Backoff: ' + backoff);
+                if(result.backoff) console.log('Backoff: ' + result.backoff);
             }
             
-            console.log(has_more,page, totalpages, quota_remaining, backoff);
+            nodes.stop.disabled = true;
+            stop = false;
+            
+            store.question_list = JSON.stringify(question_list);
+            
+            delete result.items;
+            
+            console.log(result, url);
             
             nodes.spinner.hide();
             nodes.indicator.textContent = '';
             
-            if(quota_remaining === 0) {
+            if(result.quota_remaining === 0) {
                 nodes.indicator.textContent = "No requests left, wait until next UTC day.";
             }
             
-            console.log('Quota remaining: ' + quota_remaining);
-            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
+            console.log('Quota remaining: ' + result.quota_remaining);
             
             resolve(question_list);
         });
@@ -325,10 +335,10 @@
                         if (/date/.test(k)) v = new Date(v * 1000).toISOString().replace(/T(.*)\..*/, ' $1');
                         let h = k.replace(/_/g, ' ');
                         h = h.charAt(0).toUpperCase() + h.slice(1);
-                        str += `<div class="spacer review-info"><label>${h}:</label> ${v}</div>`
+                        str += `<div class="spacer review-info"><label>${h}:</label> ${v}</div>`;
                     }
                     return str;
-                }
+                };
                 
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
             }
@@ -338,17 +348,22 @@
             nodes.indicator.textContent = queue.length ? 'Reviewing question ' + (current + 1) + ' of ' + queue.length : 'No questions to review';
         });
         
+        let refresh = false;
+        
+        nodes.refresh.addEventListener('click', _ => refresh = true);
+        
         nodes.form.addEventListener('submit', async event => {
             event.preventDefault();
             
             if(!nodes.tagged.value) {
                 nodes.indicator.textContent = 'Tag is required';
             }
-            if(nodes.tagged.value !== store.tag) {
+            if(refresh || nodes.tagged.value !== store.tag) {
                 reset(1,0,1);
                 store.tag = nodes.tagged.value;
                 question_list = await retrieve(store.tag);
                 store.question_list = JSON.stringify(question_list);
+                refresh = false;
             } else {
                 reset(0,0,1);
             }
@@ -357,6 +372,8 @@
                 (nodes.closevotes.value && e.close_vote_count >= +nodes.closevotes.value) ||
                 (nodes.deletevotes.value && e.delete_vote_count >= +nodes.deletevotes.value)
             );
+            
+            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
 
             store.queue = JSON.stringify(queue);
             store.closevotes = nodes.closevotes.value;
