@@ -16,17 +16,37 @@
 (async _ => {
     'use strict';
     
-    const StackExchange = (_ => {
-        if ("StackExchange" in window)
-            return window.StackExchange;
-        if ("StackExchange" in unsafeWindow)
-            return unsafeWindow.StackExchange;
-        else return false;
-    })();
+    const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
+        //Execute a function in the page context.
+        // Using () => doesn't set arguments, so can't use it on this function.
+        // This has to be done without jQuery, as jQuery creates the script
+        // within this context, not the page context, which results in
+        // permission denied to run the function.
+        var newScript = document.createElement('script');
+        if(typeof id === 'string' && id) {
+            newScript.id = id;
+        }
+        var args = [];
+        //using .slice(), or other Array methods, on arguments prevents optimization
+        for(var index=3;index<arguments.length;index++){
+            args.push(arguments[index]);
+        }
+        newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,JSON.parse(\'' + JSON.stringify(args).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'));";
+        document.head.appendChild(newScript);
+        if(!leaveInPage) {
+            //Synchronous scripts are executed immediately and can be immediately removed.
+            //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+            document.head.removeChild(newScript);
+        }
+        return newScript;
+    };
 
-    StackExchange.using('inlineEditing', function () {
-        StackExchange.inlineEditing.init();
-    });
+    const inPageInitInlineEditing = _ => {
+        StackExchange.using('inlineEditing', function () {
+            StackExchange.inlineEditing.init();
+        });
+    };
+    executeInPage(inPageInitInlineEditing, true, 'magicTag2-initInlineEditing');
 
     if (/^\/?review\/?$/.test(window.location.pathname)) {
         // We are on the review queue list page
@@ -300,6 +320,18 @@
             xhr.send();
         });
 
+        const inPageInitQuestionWithComments = (initInfo, questionInitId) => {
+            //This can be executed prior to StackExchange being ready. Thus, we use StackExchange.using to make sure
+            //  StackExchange is ready to have questions shown.
+            //StackExchange.question.init is in "full.js". This is loaded for any of: "loggedIn", "inlineEditing", "beginEditEvent", "translation"
+            StackExchange.using('inlineEditing', function () {
+                StackExchange.question.init(initInfo);
+                StackExchange.comments.loadAll($('.question'));
+                //Remove the <script> this was loaded in.
+                document.getElementById(questionInitId).remove();
+            });
+        };
+
         const display = current => new Promise(async (resolve, reject) => {
             reset();
 
@@ -315,13 +347,15 @@
 
                 nodes.question.innerHTML = await fetchQuestion(post);
 
-                StackExchange.question.init({
+                //Initialize the question, with comments
+                //Get a unique ID for this execution of inPageInitQuestionWithComments.
+                const questionInitId = 'magicTag2-initQuestion-' + performance.now();
+                executeInPage(inPageInitQuestionWithComments, true, questionInitId , {
                     votesCast: await fetchVotes(post),
                     canViewVoteCounts: true,
                     questionId: post
-                });
+                }, questionInitId);
 
-                StackExchange.comments.loadAll($('.question'));
                 const buildInfo = obj => {
                     const excludes = ['title'];
                     let str = '';
