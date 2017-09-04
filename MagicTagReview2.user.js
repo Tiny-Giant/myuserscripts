@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.1
+// @version      1.0.0.2
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
@@ -15,6 +15,8 @@
 /* globals unsafeWindow, $, GM_setValue, GM_getValue */
 (async _ => {
     'use strict';
+  
+    unsafeWindow.onbeforeunload = _ => "";
     
     const StackExchange = (_ => {
         if ("StackExchange" in window)
@@ -35,7 +37,7 @@
                 <div class="dashboard-count"></div>
                 <div class="dashboard-summary">
                     <div class="dashboard-summary">
-                        <div class="dashboard-title"><a href="/review/custom">Magic™ Tag Review</a></div>
+                        <div class="dashboard-title"><a href="/review/custom?noredirect=1">Magic™ Tag Review</a></div>
                         <div class="dashboard-description">Concentrated tag review with options to filter by close votes or delete votes.</div>
                     </div>
                 </div>
@@ -121,6 +123,39 @@
                 [hidden] {
                     display: none;
                 }
+                .review-filters-toggle {
+                    font-size:  11px;
+                    text-align:  center;
+                    padding:  0px;
+                    margin: -5px;
+                    margin-top:  5px;
+                    border-top: 1px solid #c8ccd0;
+                    line-height: 15px;
+                    color: rgb(122, 122, 122);
+                }
+                .review-filters td {
+                    font-size: 11px;
+                    min-width: 80px;
+                }
+                .review-filters input {
+                    margin: 0;
+                    width: 100%;
+                    box-sizing:  border-box;
+                }
+                .review-filters {
+                    font-size: 12px;
+                }
+                .review-filters-toggle:hover {
+                    background: #eee;
+                    cursor: pointer;
+                }
+                .review-form select {
+                    font-size: 13px;
+                    line-height: 30px;
+                    display:  inline-block;
+                    height: 33px;
+                    vertical-align:  middle;
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
@@ -128,18 +163,106 @@
                     <div class="review-bar">
                         <form class="review-form">
                             <input class="review-tagged" type="text" placeholder="tag">
-                            <input class="review-closevotes" type="text" placeholder="minimum close votes">
-                            <input class="review-deletevotes" type="text" placeholder="minimum delete votes">
-                            <input class="review-button" type="submit" value="Go">
-                            <input class="review-stop" type="button" value="Stop">
-                            <input class="review-refresh" type="submit" value="Refresh">
+                            <select class="review-sort">
+                                <option selected disabled>sort</option>
+                                <option value="activity">activity</option>
+                                <option value="votes">votes</option>
+                                <option value="creation">creation</option>
+                                <option value="hot">hot</option>
+                                <option value="week">week</option>
+                                <option value="month">month</option>
+                            </select>
+                            <select class="review-order">
+                                <option selected disabled>order</option>
+                                <option value="asc">asc</option>
+                                <option value="desc">desc</option>
+                            </select>
+                            <input class="review-fetch" type="submit" value="Fetch">
+                            <input class="review-stop" type="button" value="Stop" disabled="">
                         </form>
                         <input class="review-prev" type="button" value="Previous">
                         <input class="review-next" type="button" value="Next">
                         <div class="review-indicator-wrapper">
                             <img class="review-spinner" src="https://i.stack.imgur.com/MJFrt.gif" style="display: none">
-                            <span class="review-indicator"></span>
+                            <span class="review-indicator">Reviewing question 2 of 5</span>
                         </div>
+                        <div class="review-filters" style="display: none">
+                            <form class="review-filters-form">
+                                <div class="review-filters-help">
+                                    <b>Filters:</b><br>
+                                    <ul>
+                                        <li>Leave filters blank to exclude them (i.e. a minimum close vote filter of 0 is not the same as leaving the field blank)</li>
+                                        <li>When including a maximum close vote / delete vote filter, a minimum should also be included (if you want useful results)</li>
+                                        <li>Fields whose headers are marked with an asterisk will be excluded from the close vote filters</li>
+                                        <li>The close vote filter is excluded from the delete vote filters</li>
+                                    </ul>
+                                </div>
+                                <table class="review-filters-table" border="0">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="42">
+                                            </td>
+                                        <tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Min Close:</td>
+                                            <td>Max Close:</td>
+                                            <td title="Will be ignored for close vote filter">Min Reopen:*</td>
+                                            <td title="Will be ignored for close vote filter">Max Reopen:*</td>
+                                            <td title="Will be ignored for close vote filter">Min Delete:*</td>
+                                            <td title="Will be ignored for close vote filter">Max Delete:*</td>
+                                            <td>Min Answers:</td>
+                                            <td>Max Answers:</td>
+                                            <td>Min Score:</td>
+                                            <td>Max Score:</td>
+                                            <td>Min Views:</td>
+                                            <td>Max Views:</td>
+                                            <td style="width: 100%;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input class="review-minclosevotes" type="number" min="0" max="4" value=""></td>
+                                            <td><input class="review-maxclosevotes" type="number" min="0" max="4" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-minreopenvotes" type="number" min="0" max="4" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-maxreopenvotes" type="number" min="0" max="4" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-mindeletevotes" type="number" min="0" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-maxdeletevotes" type="number" min="0" value=""></td>
+                                            <td><input class="review-minanswers" type="number" min="0" value=""></td>
+                                            <td><input class="review-maxanswers" type="number" min="0" value=""></td>
+                                            <td><input class="review-minscore" type="number" value=""></td>
+                                            <td><input class="review-maxscore" type="number" value=""></td>
+                                            <td><input class="review-minviews" type="number" value=""></td>
+                                            <td><input class="review-maxviews" type="number" value=""></td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2" title="Will be ignored for close vote filter">Close Date Range Start:*</td>
+                                            <td colspan="2" title="Will be ignored for close vote filter">Close Date Range End:*</td>
+                                            <td colspan="2">Asked Date Range Start:</td>
+                                            <td colspan="2">Asked Date Range End:</td>
+                                            <td colspan="2">Last Activity Date Range Start:</td>
+                                            <td colspan="2">Last Activity Date Range End:</td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2" title="Will be ignored for close vote filter"><input class="review-closedatestart" type="date"></td>
+                                            <td colspan="2" title="Will be ignored for close vote filter"><input class="review-closedateend" type="date"></td>
+                                            <td colspan="2"><input class="review-askeddatestart" type="date"></td>
+                                            <td colspan="2"><input class="review-askeddateend" type="date"></td>
+                                            <td colspan="2"><input class="review-activitydatestart" type="date"></td>
+                                            <td colspan="2"><input class="review-activitydateend" type="date"></td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="10"></td>
+                                            <td colspan="2"><input class="review-apply-filters" type="submit" value="Apply filters"></td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </form>
+                        </div>
+                        <div class="review-filters-toggle">\u25BC</div>
                     </div>
                 </div>
                 <div class="review-header" id="question-header">
@@ -173,27 +296,62 @@
         let queue         = JSON.parse(store.queue         || '[]'),
             question_list = JSON.parse(store.question_list || '[]');
         
-        nodes.tagged.value      = store.tag         || '';
-        nodes.closevotes.value  = store.closevotes  || '';
-        nodes.deletevotes.value = store.deletevotes || '';
+        nodes.tagged           .value = store.tagged            || '';
+        nodes.sort             .value = store.sort              || '';
+        nodes.order            .value = store.order             || '';
+        nodes.minclosevotes    .value = store.minclose          || '';
+        nodes.maxclosevotes    .value = store.maxclose          || '';
+        nodes.mindeletevotes   .value = store.mindelete         || '';
+        nodes.maxdeletevotes   .value = store.maxdelete         || '';
+        nodes.minreopenvotes   .value = store.minreopen         || '';
+        nodes.maxreopenvotes   .value = store.maxreopen         || '';
+        nodes.minanswers       .value = store.minanswers        || '';
+        nodes.maxanswers       .value = store.maxanswers        || '';
+        nodes.minscore         .value = store.minscore          || '';
+        nodes.maxscore         .value = store.maxscore          || '';
+        nodes.minviews         .value = store.minviews          || '';
+        nodes.maxviews         .value = store.maxviews          || '';
+        nodes.closedatestart   .value = store.closedatestart    || '';
+        nodes.closedateend     .value = store.closedateend      || '';
+        nodes.askeddatestart   .value = store.askeddatestart    || '';
+        nodes.askeddateend     .value = store.askeddateend      || '';
+        nodes.activitydatestart.value = store.activitydatestart || '';
+        nodes.activitydateend  .value = store.activitydateend   || '';
         
         nodes.spinner.show = _ => nodes.spinner.style.display = '';
         nodes.spinner.hide = _ => nodes.spinner.style.display = 'none';
 
-        const reset = (queue, form, current) => {
-            if(queue) {
+        const reset = (q, f, c) => {
+            if(q) {
                 queue         = [];
                 question_list = [];
-
-                store.queue         = JSON.stringify(queue);
-                store.question_list = JSON.stringify(question_list);
+                store.queue         = '[]';
+                store.question_list = '[]';
             }
-            if(form) {
-                store.tag         = '';
-                store.closevotes  = '';
-                store.deletevotes = '';
+            if(f) {
+                nodes.tagged           .value = '';
+                nodes.sort             .value = '';
+                nodes.order            .value = '';
+                nodes.minclosevotes    .value = '';
+                nodes.maxclosevotes    .value = '';
+                nodes.mindeletevotes   .value = '';
+                nodes.maxdeletevotes   .value = '';
+                nodes.minreopenvotes   .value = '';
+                nodes.maxreopenvotes   .value = '';
+                nodes.minanswers       .value = '';
+                nodes.maxanswers       .value = '';
+                nodes.minscore         .value = '';
+                nodes.maxscore         .value = '';
+                nodes.minviews         .value = '';
+                nodes.maxviews         .value = '';
+                nodes.closedatestart   .value = '';
+                nodes.closedateend     .value = '';
+                nodes.askeddatestart   .value = '';
+                nodes.askeddateend     .value = '';
+                nodes.activitydatestart.value = '';
+                nodes.activitydateend  .value = '';
             }
-            if(current) {
+            if(c) {
                 store.current = 0;
             }
 
@@ -201,6 +359,7 @@
             nodes.question.innerHTML    = '';
             nodes.title.href            = '';
             nodes.title.innerHTML       = '';
+            nodes.fetch.disabled        = false;
             nodes.stop.disabled         = true;
             nodes.prev.disabled         = true;
             nodes.next.disabled         = true;
@@ -211,29 +370,38 @@
         
         nodes.stop.addEventListener('click', _ => stop = true);
 
-        const retrieve = tagged => new Promise(async (resolve, reject) => {
+        const retrieve = _ => new Promise(async (resolve, reject) => {
+            if(!nodes.tagged.value) {
+                nodes.indicator.textContent = 'Tag is required';
+                return;
+            }
+            
+            store.tagged = nodes.tagged.value;
+            store.sort   = nodes.sort  .value;
+            store.order  = nodes.order .value;
+            
             reset(1,0,1);
             
-            nodes.stop.disabled = false;
+            nodes.fetch.disabled = true;
+            nodes.stop .disabled = false;
+            nodes.spinner.show();
 
             const result = { quota_remaining: 1, backoff: undefined };
 
             let page = 1, totalpages = 1, url;
         
-            nodes.spinner.show();
-        
             while(page <= totalpages && result.quota_remaining !== 0 && !result.backoff && stop === false) {
-                nodes.indicator.textContent = 'Retrieving question list (page ' + page + ' of ' + (totalpages||0)  + ')';
-                url = location.protocol + '//api.stackexchange.com/2.2/questions?' + [
-                    'page=' + page++,
+                nodes.indicator.textContent = `Retrieving question list (page ${page} of ${(totalpages||1)})`;
+                url = `${location.protocol}//api.stackexchange.com/2.2/questions?${[
+                    `page=${page++}`,
                     'pagesize=100',
-                    'order=asc',
-                    'sort=votes',
-                    'site=' + /\/([\w.]*)\.com/.exec(location.href)[1],
+                    `order=${store.order}`,
+                    `sort=${store.sort}`,
+                    `site=${/\/([\w.]*)\.com/.exec(location.href)[1]}`,
                     'key=dwtLmAaEXumZlC5Nj0vDuw((',
-                    'filter=!m)BxSjkODD1qUae7JH1Ff5WcCKJJMTiHQO5fpin72FE2B_6YEmt(kALb',
-                    'tagged=' + encodeURIComponent(tagged)
-                ].join('&');
+                    'filter=!6C_(7U8z1Z.G(-FccGvR6tipy9omyXpnK(jh7xd79r3i_EQqCgxwYD3KyfY',
+                    `tagged=${encodeURIComponent(store.tagged)}`
+                ].join('&')}`;
                 
                 const response = await fetch(url);
                 
@@ -249,18 +417,16 @@
                 
                 if(result.backoff) console.log('Backoff: ' + result.backoff);
             }
-            
-            nodes.stop.disabled = true;
-            stop = false;
-            
             store.question_list = JSON.stringify(question_list);
             
-            delete result.items;
-            
-            console.log(result, url);
-            
             nodes.spinner.hide();
+            nodes.fetch.disabled = true;
+            nodes.stop.disabled = true;
             nodes.indicator.textContent = '';
+            stop = false;
+            
+            delete result.items;
+            console.log(result, url);
             
             if(result.quota_remaining === 0) {
                 nodes.indicator.textContent = "No requests left, wait until next UTC day.";
@@ -322,6 +488,7 @@
                 });
 
                 StackExchange.comments.loadAll($('.question'));
+                
                 const buildInfo = obj => {
                     const excludes = ['title'];
                     let str = '';
@@ -341,57 +508,118 @@
                 };
                 
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
+                StackExchange.using("snippets", function () {
+                    StackExchange.snippets.initSnippetRenderer();
+                });
             }
-
+            
             nodes.prev.disabled = !queue.length || current < 1;
             nodes.next.disabled = !queue.length || current === queue.length - 1;
             nodes.indicator.textContent = queue.length ? 'Reviewing question ' + (current + 1) + ' of ' + queue.length : 'No questions to review';
         });
         
-        let refresh = false;
+        const filterQuestions = question_list => {
+            reset(0,0,1);
         
-        nodes.refresh.addEventListener('click', _ => refresh = true);
+            store.minclose          = nodes.minclosevotes    .value ? +nodes.minclosevotes   .value : '';
+            store.maxclose          = nodes.maxclosevotes    .value ? +nodes.maxclosevotes   .value : '';
+            store.minreopen         = nodes.minreopenvotes   .value ? +nodes.minreopenvotes  .value : '';
+            store.maxreopen         = nodes.maxreopenvotes   .value ? +nodes.maxreopenvotes  .value : '';
+            store.mindelete         = nodes.mindeletevotes   .value ? +nodes.mindeletevotes  .value : '';
+            store.maxdelete         = nodes.maxdeletevotes   .value ? +nodes.maxdeletevotes  .value : '';
+            store.minanswers        = nodes.minanswers       .value ? +nodes.minanswers      .value : '';
+            store.maxanswers        = nodes.maxanswers       .value ? +nodes.maxanswers      .value : '';
+            store.minscore          = nodes.minscore         .value ? +nodes.minscore        .value : '';
+            store.maxscore          = nodes.maxscore         .value ? +nodes.maxscore        .value : '';
+            store.minviews          = nodes.minviews         .value ? +nodes.minviews        .value : '';
+            store.maxviews          = nodes.maxviews         .value ? +nodes.maxviews        .value : '';
+            store.closedatestart    = nodes.closedatestart   .value ? nodes.closedatestart   .value : '';
+            store.closedateend      = nodes.closedateend     .value ? nodes.closedateend     .value : '';
+            store.askeddatestart    = nodes.askeddatestart   .value ? nodes.askeddatestart   .value : '';
+            store.askeddateend      = nodes.askeddateend     .value ? nodes.askeddateend     .value : '';
+            store.activitydatestart = nodes.activitydatestart.value ? nodes.activitydatestart.value : '';
+            store.activitydateend   = nodes.activitydateend  .value ? nodes.activitydateend  .value : '';
+            
+            
+            const closedatestart    = new Date(store.closedatestart   ).getTime() / 1000;
+            const closedateend      = new Date(store.closedateend     ).getTime() / 1000;
+            const askeddatestart    = new Date(store.askeddatestart   ).getTime() / 1000;
+            const askeddateend      = new Date(store.askeddateend     ).getTime() / 1000;
+            const activitydatestart = new Date(store.activitydatestart).getTime() / 1000;
+            const activitydateend   = new Date(store.activitydateend  ).getTime() / 1000; 
+            
+            const filters = {
+                incloserange       : e => (store.minclose          !== '' ? store.minclose          <= e.close_vote_count   : true) &&
+                                          (store.maxclose          !== '' ? store.maxclose          >= e.close_vote_count   : true) ,
+                indeleterange      : e => (store.mindelete         !== '' ? store.mindelete         <= e.delete_vote_count  : true) &&
+                                          (store.maxdelete         !== '' ? store.maxdelete         >= e.delete_vote_count  : true) ,
+                inreopenrange      : e => (store.minreopen         !== '' ? store.minreopen         <= e.reopen_vote_count  : true) &&
+                                          (store.maxreopen         !== '' ? store.maxreopen         >= e.reopen_vote_count  : true) ,
+                inanswerrange      : e => (store.minanswers        !== '' ? store.minanswers        <= e.answer_count       : true) &&
+                                          (store.maxanswers        !== '' ? store.maxanswers        >= e.answer_count       : true) ,
+                inscorerange       : e => (store.minscore          !== '' ? store.minscore          <= e.score              : true) &&
+                                          (store.maxscore          !== '' ? store.maxscore          >= e.score              : true) ,
+                inviewsrange       : e => (store.minviews          !== '' ? store.minviews          <= e.view_count         : true) &&
+                                          (store.maxviews          !== '' ? store.maxviews          >= e.view_count         : true) ,
+                inclosedaterange   : e => (store.closedatestart    !== '' ?       closedatestart    <= e.closed_date        : true) &&
+                                          (store.closedateend      !== '' ?       closedateend      >= e.closed_date        : true) ,
+                inaskeddaterange   : e => (store.askeddatestart    !== '' ?       askeddatestart    <= e.creation_date      : true) &&
+                                          (store.askeddateend      !== '' ?       askeddateend      >= e.creation_date      : true) ,
+                inactivitydaterange: e => (store.activitydatestart !== '' ?       activitydatestart <= e.last_activity_date : true) &&
+                                          (store.activitydateend   !== '' ?       activitydateend   >= e.last_activity_date : true) 
+            };
+            
+            const filter = e => Object.entries(filters).reduce((m, [k, v]) => Object.assign(m, {[k]: v(e)}), {});
+            
+            const queue = question_list.filter(e => {
+                
+                const r = filter(e);
+                
+                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange) return false;
+                
+                if( ((store.minclose  !== '' || store.maxclose  !== '') && r.incloserange                                                                                     ) ||
+                    ((store.mindelete !== '' || store.maxdelete !== '') && r.indeleterange && r.inreopenrange && r.inclosedaterange                                           ) ||
+                    ((store.minreopen !== '' || store.maxreopen !== '') && r.inreopenrange && r.incloserange  && r.inclosedaterange                                           ) ||
+                    ( store.mindelete === '' && store.maxdelete === ''  && store.minclose  === '' && store.maxclose  === ''  && store.minreopen === '' && store.maxreopen === '' && r.inclosedaterange) )  return true;
+            });
+            
+            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
+            
+            return queue;
+        };
         
         nodes.form.addEventListener('submit', async event => {
             event.preventDefault();
-            
-            if(!nodes.tagged.value) {
-                nodes.indicator.textContent = 'Tag is required';
-            }
-            if(refresh || nodes.tagged.value !== store.tag) {
-                reset(1,0,1);
-                store.tag = nodes.tagged.value;
-                question_list = await retrieve(store.tag);
-                store.question_list = JSON.stringify(question_list);
-                refresh = false;
-            } else {
-                reset(0,0,1);
-            }
-            
-            queue = question_list.filter(e => 
-                (nodes.closevotes.value && e.close_vote_count >= +nodes.closevotes.value) ||
-                (nodes.deletevotes.value && e.delete_vote_count >= +nodes.deletevotes.value)
-            );
-            
-            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
-
+            question_list = await retrieve();
+            store.question_list = JSON.stringify(question_list);
+            queue = filterQuestions(question_list);
             store.queue = JSON.stringify(queue);
-            store.closevotes = nodes.closevotes.value;
-            store.deletevotes = nodes.deletevotes.value;
-
             display(+store.current);
         });
-
-        nodes.prev.addEventListener('click', event => {
+        
+        nodes.filtersForm.addEventListener('submit', event => {
             event.preventDefault();
+            queue = filterQuestions(question_list);
+            store.queue = JSON.stringify(queue);
+            display(+store.current);
+        }, false);
+
+        nodes.prev.addEventListener('click', _ => {
             store.current = +store.current - 1;
             display(+store.current);
         }, false);
 
-        nodes.next.addEventListener('click', event => {
-            event.preventDefault();
+        nodes.next.addEventListener('click', _ => {
             store.current = +store.current + 1;
             display(+store.current);
+        }, false);
+        
+        let open = false;
+        
+        nodes.filtersToggle.addEventListener('click', _ => {
+            nodes.filters.style.display = open ? "none" : "";
+            nodes.filtersToggle.textContent = open ? `\u25BC` : `\u25B2`;
+            open = !open;
         }, false);
         
         display(+store.current);
