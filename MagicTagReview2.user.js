@@ -4,6 +4,7 @@
 // @version      1.0.0.2
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
+// @contributor  @Makyen
 // @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
 // @grant        unsafeWindow
 // @grant        GM_getValue
@@ -15,20 +16,40 @@
 /* globals unsafeWindow, $, GM_setValue, GM_getValue */
 (async _ => {
     'use strict';
-  
-    unsafeWindow.onbeforeunload = _ => "";
     
-    const StackExchange = (_ => {
-        if ("StackExchange" in window)
-            return window.StackExchange;
-        if ("StackExchange" in unsafeWindow)
-            return unsafeWindow.StackExchange;
-        else return false;
-    })();
+    const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
+        //Execute a function in the page context.
+        // Using () => doesn't set arguments, so can't use it on this function.
+        // This has to be done without jQuery, as jQuery creates the script
+        // within this context, not the page context, which results in
+        // permission denied to run the function.
+        var newScript = document.createElement('script');
+        if(typeof id === 'string' && id) {
+            newScript.id = id;
+        }
+        var args = [];
+        //using .slice(), or other Array methods, on arguments prevents optimization
+        for(var index=3;index<arguments.length;index++){
+            args.push(arguments[index]);
+        }
+        newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,JSON.parse(\'' + JSON.stringify(args).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'));";
+        document.head.appendChild(newScript);
+        if(!leaveInPage) {
+            //Synchronous scripts are executed immediately and can be immediately removed.
+            //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+            document.head.removeChild(newScript);
+        }
+        return newScript;
+    };
 
-    StackExchange.using('inlineEditing', function () {
-        StackExchange.inlineEditing.init();
-    });
+    const inPageInitInlineEditing = inlineEditingInitId => {
+        StackExchange.using('inlineEditing', function () {
+            StackExchange.inlineEditing.init();
+            document.getElementById(inlineEditingInitId).remove();
+        });
+    };
+    const inlineEditingInitId = 'magicTag2-initInlineEditing-' + performance.now();
+    executeInPage(inPageInitInlineEditing, true, inlineEditingInitId, inlineEditingInitId);
 
     if (/^\/?review\/?$/.test(window.location.pathname)) {
         // We are on the review queue list page
@@ -466,6 +487,26 @@
             xhr.send();
         });
 
+        const inPageInitQuestionWithComments = (initInfo, questionInitId) => {
+            //Direct SE to load what we need (SE.using), but wait to execute until we know it's available (SE.ready).
+            //StackExchange.question.init is in "full.js", which is loaded for any of: "loggedIn", "inlineEditing", "beginEditEvent", "translation".
+            StackExchange.using('inlineEditing', function () {
+                StackExchange.ready(function () {
+                    StackExchange.question.init(initInfo);
+                    StackExchange.comments.loadAll($('.question'));
+                    //Remove the <script> this was loaded in.
+                    document.getElementById(questionInitId).remove();
+                });
+            });
+        };
+
+        const inPageInitSnippetRenderer = snippetInitId => {
+            StackExchange.using("snippets", function () {
+                StackExchange.snippets.initSnippetRenderer();
+                document.getElementById(snippetInitId).remove();
+            });
+        };
+
         const display = current => new Promise(async (resolve, reject) => {
             reset();
 
@@ -481,14 +522,15 @@
 
                 nodes.question.innerHTML = await fetchQuestion(post);
 
-                StackExchange.question.init({
+                //Initialize the question, with comments
+                //Get a unique ID for this execution of inPageInitQuestionWithComments.
+                const questionInitId = 'magicTag2-initQuestion-' + performance.now();
+                executeInPage(inPageInitQuestionWithComments, true, questionInitId , {
                     votesCast: await fetchVotes(post),
                     canViewVoteCounts: true,
                     questionId: post
-                });
+                }, questionInitId);
 
-                StackExchange.comments.loadAll($('.question'));
-                
                 const buildInfo = obj => {
                     const excludes = ['title'];
                     let str = '';
@@ -508,9 +550,8 @@
                 };
                 
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
-                StackExchange.using("snippets", function () {
-                    StackExchange.snippets.initSnippetRenderer();
-                });
+                const snippetInitId = 'magicTag2-initSnippetRenderer-' + performance.now();
+                executeInPage(inPageInitSnippetRenderer, true, snippetInitId , snippetInitId);
             }
             
             nodes.prev.disabled = !queue.length || current < 1;
