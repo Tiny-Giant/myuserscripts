@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.3
+// @version      1.0.0.4
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -73,7 +73,7 @@
             get: (t, k) => GM_getValue(`MagicTagReview-${ k }`),
             set: (t, k, v) => (GM_setValue(`MagicTagReview-${ k }`, v), true)
         });
-
+        
         const nodes = (_ => {
             const scope = Object.assign(document.querySelector('#mainbar-full'), { innerHTML: '' });
             const wrapper = scope.appendChild(Object.assign(document.createElement('span'), { className: 'review-bar-wrapper'  }));
@@ -275,7 +275,16 @@
                                             <td></td>
                                         </tr>
                                         <tr>
-                                            <td colspan="10"></td>
+                                            <td colspan="4">Includes Tags:</td>
+                                            <td colspan="4">Excludes Tags:</td>
+                                            <td colspan="2"></td>
+                                            <td colspan="2"></td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="4"><input class="review-includestags" type="text" placeholder="html, css"></td>
+                                            <td colspan="4"><input class="review-excludestags" type="text" placeholder="php, java"></td>
+                                            <td colspan="2"></td>
                                             <td colspan="2"><input class="review-apply-filters" type="submit" value="Apply filters"></td>
                                             <td></td>
                                         </tr>
@@ -338,6 +347,8 @@
         nodes.askeddateend     .value = store.askeddateend      || '';
         nodes.activitydatestart.value = store.activitydatestart || '';
         nodes.activitydateend  .value = store.activitydateend   || '';
+        nodes.includestags     .value = store.includestags      || '';
+        nodes.excludestags     .value = store.excludestags      || '';
         
         nodes.spinner.show = _ => nodes.spinner.style.display = '';
         nodes.spinner.hide = _ => nodes.spinner.style.display = 'none';
@@ -371,6 +382,8 @@
                 nodes.askeddateend     .value = '';
                 nodes.activitydatestart.value = '';
                 nodes.activitydateend  .value = '';
+                nodes.includestags     .value = '';
+                nodes.excludestags     .value = '';
             }
             if(c) {
                 store.current = 0;
@@ -420,7 +433,7 @@
                     `sort=${store.sort}`,
                     `site=${/\/([\w.]*)\.com/.exec(location.href)[1]}`,
                     'key=dwtLmAaEXumZlC5Nj0vDuw((',
-                    'filter=!6C_(7U8z1Z.G(-FccGvR6tipy9omyXpnK(jh7xd79r3i_EQqCgxwYD3KyfY',
+                    'filter=!6C_(7U8z1Z.G(-FYu*du3BYFpgEsGHOIh5UNpIDVehEi)Z(IOASoCIGNO7-',
                     `tagged=${encodeURIComponent(store.tagged)}`
                 ].join('&')}`;
                 
@@ -580,6 +593,8 @@
             store.askeddateend      = nodes.askeddateend     .value ? nodes.askeddateend     .value : '';
             store.activitydatestart = nodes.activitydatestart.value ? nodes.activitydatestart.value : '';
             store.activitydateend   = nodes.activitydateend  .value ? nodes.activitydateend  .value : '';
+            store.includestags      = nodes.includestags     .value ? nodes.includestags     .value : '';
+            store.excludestags      = nodes.excludestags     .value ? nodes.excludestags     .value : '';
             
             
             const closedatestart    = new Date(store.closedatestart   ).getTime() / 1000;
@@ -588,6 +603,8 @@
             const askeddateend      = new Date(store.askeddateend     ).getTime() / 1000;
             const activitydatestart = new Date(store.activitydatestart).getTime() / 1000;
             const activitydateend   = new Date(store.activitydateend  ).getTime() / 1000; 
+            const includestags      = store.includestags.split(/,\s+/g); 
+            const excludestags      = store.excludestags.split(/,\s+/g); 
             
             const filters = {
                 incloserange       : e => (store.minclose          !== '' ? store.minclose          <= e.close_vote_count   : true) &&
@@ -607,7 +624,9 @@
                 inaskeddaterange   : e => (store.askeddatestart    !== '' ?       askeddatestart    <= e.creation_date      : true) &&
                                           (store.askeddateend      !== '' ?       askeddateend      >= e.creation_date      : true) ,
                 inactivitydaterange: e => (store.activitydatestart !== '' ?       activitydatestart <= e.last_activity_date : true) &&
-                                          (store.activitydateend   !== '' ?       activitydateend   >= e.last_activity_date : true) 
+                                          (store.activitydateend   !== '' ?       activitydateend   >= e.last_activity_date : true) ,
+                includestags       : e =>  store.includestags      !== '' ? includestags.every(t =>  e.tags.includes(t))    : true  ,
+                excludestags       : e =>  store.excludestags      !== '' ? excludestags.every(t => !e.tags.includes(t))    : true  
             };
             
             const filter = e => Object.entries(filters).reduce((m, [k, v]) => Object.assign(m, {[k]: v(e)}), {});
@@ -616,7 +635,7 @@
                 
                 const r = filter(e);
                 
-                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange) return false;
+                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange || !r.includestags || !r.excludestags) return false;
                 
                 if( ((store.minclose  !== '' || store.maxclose  !== '') && r.incloserange                                                                                     ) ||
                     ((store.mindelete !== '' || store.maxdelete !== '') && r.indeleterange && r.inreopenrange && r.inclosedaterange                                           ) ||
