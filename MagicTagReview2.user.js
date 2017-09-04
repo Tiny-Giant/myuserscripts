@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.5
+// @version      1.0.0.6
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -186,6 +186,15 @@
                 .review-top-right {
                     float: right;
                 }
+                .review-info {
+                    overflow: hidden;
+                }
+                .review-info .left {
+                    float: left;
+                }
+                .review-info .right {
+                    float: right;
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
@@ -306,13 +315,15 @@
                         <div class="review-filters-toggle">\u25BC</div>
                     </div>
                 </div>
-                <div class="review-header" id="question-header">
-                    <h1><a class="review-title" target="_blank"></a></h1>
-                </div>
-                <div class="review-question"></div>
-                <div class="review-sidebar module community-bulletin">
-                    <div class="bulletin-title review-sidebar-header">Post Information</div> <hr>
-                    <div class="review-information"></div>
+                <div class="review-task" style="display: none">
+                    <div class="review-header" id="question-header">
+                        <h1><a class="review-title" target="_blank"></a></h1>
+                    </div>
+                    <div class="review-question"></div>
+                    <div class="review-sidebar module community-bulletin">
+                        <div class="bulletin-title review-sidebar-header">Post Information</div> <hr>
+                        <div class="review-information"></div>
+                    </div>
                 </div>
                 <style type="text/css">${CSS}</style>
             `;
@@ -404,6 +415,8 @@
                 store.current = 0;
             }
 
+            $(document).off("click", ".post-menu a.short-link");
+            nodes.task.style.display    = 'none';
             nodes.information.innerHTML = '';
             nodes.question.innerHTML    = '';
             nodes.title.href            = '';
@@ -559,6 +572,27 @@
                     questionId: post
                 }, questionInitId);
 
+                const prettyDate = time => {
+                    if (time == null || time.length != 20) return;
+
+                    // firefox requires ISO 8601 formated dates
+                    time = time.substr(0, 10) + "T" + time.substr(11, 10);
+                    var date = new Date(time),
+                        diff = (((new Date()).getTime() - date.getTime()) / 1000) + StackExchange.options.serverTimeOffsetSec,
+                        day_diff = Math.floor(diff / 86400);
+
+                    if (isNaN(day_diff) || day_diff < 0 || day_diff >= 31)
+                        return;
+
+                    return day_diff == 0 && (
+                        diff < 2 && "just now" ||
+                        diff < 60 && (function(n){return n.seconds==1?n.seconds+" sec ago":n.seconds+" secs ago"})({seconds:Math.floor(diff)}) ||
+                        diff < 120 && "1 min ago" ||
+                        diff < 3600 && (function(n){return n.minutes==1?n.minutes+" min ago":n.minutes+" mins ago"})({minutes:Math.floor(diff/60)}) ||
+                        diff < 7200 && "1 hour ago" ||
+                        diff < 86400 && (function(n){return n.hours==1?n.hours+" hour ago":n.hours+" hours ago"})({hours:Math.floor(diff/3600)}));
+                };
+
                 const buildInfo = obj => {
                     const excludes = ['title'];
                     let str = '';
@@ -569,10 +603,13 @@
                                  v = `<a href="${v.link}">${v.display_name}</a>`;
                             else v = buildInfo(v);
                         }
-                        if (/date/.test(k)) v = new Date(v * 1000).toISOString().replace(/T(.*)\..*/, ' $1');
+                        if (/date/.test(k)) {
+                            const date = new Date(v * 1000).toISOString().replace(/T(.*)\..*/, ' $1Z');
+                            v = `<span class="relativetime" title="${date}">${prettyDate(date)}</span>`;
+                        }
                         let h = k.replace(/_/g, ' ');
                         h = h.charAt(0).toUpperCase() + h.slice(1);
-                        str += `<div class="spacer review-info"><label>${h}:</label> ${v}</div>`;
+                        str += `<div class="spacer review-info"><label class="left">${h}:</label> <span class="right">${v}</span></div>`;
                     }
                     return str;
                 };
@@ -580,6 +617,7 @@
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
                 const snippetInitId = 'magicTag2-initSnippetRenderer-' + performance.now();
                 executeInPage(inPageInitSnippetRenderer, true, snippetInitId , snippetInitId);
+                nodes.task.style.display="";
             }
             
             nodes.prev.disabled = !queue.length || current < 1;
