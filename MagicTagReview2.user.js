@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.4
+// @version      1.0.0.5
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -156,7 +156,7 @@
                 }
                 .review-filters td {
                     font-size: 11px;
-                    min-width: 80px;
+                    min-width: 85px;
                 }
                 .review-filters input {
                     margin: 0;
@@ -177,35 +177,48 @@
                     height: 33px;
                     vertical-align:  middle;
                 }
+                .review-bar-top {
+                    overflow: hidden;
+                }
+                .review-form {
+                    float: left;
+                }
+                .review-top-right {
+                    float: right;
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
                     <div class="review-bar-anchor"></div>
                     <div class="review-bar">
-                        <form class="review-form">
-                            <input class="review-tagged" type="text" placeholder="tag">
-                            <select class="review-sort">
-                                <option selected disabled>sort</option>
-                                <option value="activity">activity</option>
-                                <option value="votes">votes</option>
-                                <option value="creation">creation</option>
-                                <option value="hot">hot</option>
-                                <option value="week">week</option>
-                                <option value="month">month</option>
-                            </select>
-                            <select class="review-order">
-                                <option selected disabled>order</option>
-                                <option value="asc">asc</option>
-                                <option value="desc">desc</option>
-                            </select>
-                            <input class="review-fetch" type="submit" value="Fetch">
-                            <input class="review-stop" type="button" value="Stop" disabled="">
-                        </form>
-                        <input class="review-prev" type="button" value="Previous">
-                        <input class="review-next" type="button" value="Next">
-                        <div class="review-indicator-wrapper">
-                            <img class="review-spinner" src="https://i.stack.imgur.com/MJFrt.gif" style="display: none">
-                            <span class="review-indicator">Reviewing question 2 of 5</span>
+                        <div class="review-bar-top">
+                            <form class="review-form">
+                                <input class="review-tagged" type="text" placeholder="tag">
+                                <select class="review-sort">
+                                    <option selected disabled>sort</option>
+                                    <option value="activity">activity</option>
+                                    <option value="votes">votes</option>
+                                    <option value="creation">creation</option>
+                                    <option value="hot">hot</option>
+                                    <option value="week">week</option>
+                                    <option value="month">month</option>
+                                </select>
+                                <select class="review-order">
+                                    <option selected disabled>order</option>
+                                    <option value="asc">asc</option>
+                                    <option value="desc">desc</option>
+                                </select>
+                                <input class="review-fetch" type="submit" value="Fetch">
+                                <input class="review-stop" type="button" value="Stop" disabled="">
+                            </form>
+                            <div class="review-top-right">
+                                <div class="review-indicator-wrapper">
+                                    <img class="review-spinner" src="https://i.stack.imgur.com/MJFrt.gif" style="display: none">
+                                    <span class="review-indicator">Reviewing question 2 of 5</span>
+                                </div>
+                                <input class="review-prev" type="button" value="Previous">
+                                <input class="review-next" type="button" value="Next">
+                            </div>
                         </div>
                         <div class="review-filters" style="display: none">
                             <form class="review-filters-form">
@@ -239,7 +252,6 @@
                                             <td>Max Score:</td>
                                             <td>Min Views:</td>
                                             <td>Max Views:</td>
-                                            <td style="width: 100%;"></td>
                                         </tr>
                                         <tr>
                                             <td><input class="review-minclosevotes" type="number" min="0" max="4" value=""></td>
@@ -254,7 +266,6 @@
                                             <td><input class="review-maxscore" type="number" value=""></td>
                                             <td><input class="review-minviews" type="number" value=""></td>
                                             <td><input class="review-maxviews" type="number" value=""></td>
-                                            <td></td>
                                         </tr>
                                         <tr>
                                             <td colspan="2" title="Will be ignored for close vote filter">Close Date Range Start:*</td>
@@ -263,7 +274,6 @@
                                             <td colspan="2">Asked Date Range End:</td>
                                             <td colspan="2">Last Activity Date Range Start:</td>
                                             <td colspan="2">Last Activity Date Range End:</td>
-                                            <td></td>
                                         </tr>
                                         <tr>
                                             <td colspan="2" title="Will be ignored for close vote filter"><input class="review-closedatestart" type="date"></td>
@@ -272,21 +282,22 @@
                                             <td colspan="2"><input class="review-askeddateend" type="date"></td>
                                             <td colspan="2"><input class="review-activitydatestart" type="date"></td>
                                             <td colspan="2"><input class="review-activitydateend" type="date"></td>
-                                            <td></td>
                                         </tr>
                                         <tr>
                                             <td colspan="4">Includes Tags:</td>
                                             <td colspan="4">Excludes Tags:</td>
-                                            <td colspan="2"></td>
-                                            <td colspan="2"></td>
-                                            <td></td>
+                                            <td colspan="2">Last Edit Date Range Start:</td>
+                                            <td colspan="2">Last Edit Date Range End:</td>
                                         </tr>
                                         <tr>
                                             <td colspan="4"><input class="review-includestags" type="text" placeholder="html, css"></td>
                                             <td colspan="4"><input class="review-excludestags" type="text" placeholder="php, java"></td>
-                                            <td colspan="2"></td>
+                                            <td colspan="2"><input class="review-editdatestart" type="date"></td>
+                                            <td colspan="2"><input class="review-editdateend" type="date"></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="10"></td>
                                             <td colspan="2"><input class="review-apply-filters" type="submit" value="Apply filters"></td>
-                                            <td></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -347,6 +358,8 @@
         nodes.askeddateend     .value = store.askeddateend      || '';
         nodes.activitydatestart.value = store.activitydatestart || '';
         nodes.activitydateend  .value = store.activitydateend   || '';
+        nodes.editdatestart    .value = store.editdatestart     || '';
+        nodes.editdateend      .value = store.editdateend       || '';
         nodes.includestags     .value = store.includestags      || '';
         nodes.excludestags     .value = store.excludestags      || '';
         
@@ -382,6 +395,8 @@
                 nodes.askeddateend     .value = '';
                 nodes.activitydatestart.value = '';
                 nodes.activitydateend  .value = '';
+                nodes.editdatestart    .value = '';
+                nodes.editdateend      .value = '';
                 nodes.includestags     .value = '';
                 nodes.excludestags     .value = '';
             }
@@ -433,7 +448,7 @@
                     `sort=${store.sort}`,
                     `site=${/\/([\w.]*)\.com/.exec(location.href)[1]}`,
                     'key=dwtLmAaEXumZlC5Nj0vDuw((',
-                    'filter=!6C_(7U8z1Z.G(-FYu*du3BYFpgEsGHOIh5UNpIDVehEi)Z(IOASoCIGNO7-',
+                    'filter=!6C_(7U8z1Z.G(-FUAWXe3PUs*p6kip9BgZ*MrbbgvOQV*)k6GLjHx*p3_q6',
                     `tagged=${encodeURIComponent(store.tagged)}`
                 ].join('&')}`;
                 
@@ -593,6 +608,8 @@
             store.askeddateend      = nodes.askeddateend     .value ? nodes.askeddateend     .value : '';
             store.activitydatestart = nodes.activitydatestart.value ? nodes.activitydatestart.value : '';
             store.activitydateend   = nodes.activitydateend  .value ? nodes.activitydateend  .value : '';
+            store.editdatestart     = nodes.editdatestart    .value ? nodes.editdatestart    .value : '';
+            store.editdateend       = nodes.editdateend      .value ? nodes.editdateend      .value : '';
             store.includestags      = nodes.includestags     .value ? nodes.includestags     .value : '';
             store.excludestags      = nodes.excludestags     .value ? nodes.excludestags     .value : '';
             
@@ -603,6 +620,8 @@
             const askeddateend      = new Date(store.askeddateend     ).getTime() / 1000;
             const activitydatestart = new Date(store.activitydatestart).getTime() / 1000;
             const activitydateend   = new Date(store.activitydateend  ).getTime() / 1000; 
+            const editdatestart     = new Date(store.editdatestart    ).getTime() / 1000;
+            const editdateend       = new Date(store.editdateend      ).getTime() / 1000; 
             const includestags      = store.includestags.split(/,\s+/g); 
             const excludestags      = store.excludestags.split(/,\s+/g); 
             
@@ -625,6 +644,8 @@
                                           (store.askeddateend      !== '' ?       askeddateend      >= e.creation_date      : true) ,
                 inactivitydaterange: e => (store.activitydatestart !== '' ?       activitydatestart <= e.last_activity_date : true) &&
                                           (store.activitydateend   !== '' ?       activitydateend   >= e.last_activity_date : true) ,
+                ineditdaterange    : e => (store.editdatestart     !== '' ?       editdatestart     <= e.last_edit_date     : true) &&
+                                          (store.editdateend       !== '' ?       editdateend       >= e.last_edit_date     : true) ,
                 includestags       : e =>  store.includestags      !== '' ? includestags.every(t =>  e.tags.includes(t))    : true  ,
                 excludestags       : e =>  store.excludestags      !== '' ? excludestags.every(t => !e.tags.includes(t))    : true  
             };
@@ -635,7 +656,7 @@
                 
                 const r = filter(e);
                 
-                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange || !r.includestags || !r.excludestags) return false;
+                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange || !r.ineditdaterange || !r.includestags || !r.excludestags) return false;
                 
                 if( ((store.minclose  !== '' || store.maxclose  !== '') && r.incloserange                                                                                     ) ||
                     ((store.mindelete !== '' || store.maxdelete !== '') && r.indeleterange && r.inreopenrange && r.inclosedaterange                                           ) ||
