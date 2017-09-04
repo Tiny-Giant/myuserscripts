@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.6
+// @version      1.0.0.7
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -195,6 +195,18 @@
                 .review-info .right {
                     float: right;
                 }
+                .review-filters-help-header:hover {
+                    cursor: pointer;
+                    background: #eee;
+                }
+                .review-filters-help-header {
+                    padding: 5px;
+                }
+                .review-filters-help-header .toggle-indicator {
+                    font-weight: bold;
+                    font-size:  11px;
+                    color: rgb(122, 122, 122);
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
@@ -231,15 +243,23 @@
                         </div>
                         <div class="review-filters" style="display: none">
                             <form class="review-filters-form">
-                                <div class="review-filters-help">
-                                    <b>Filters:</b><br>
-                                    <ul>
-                                        <li>Leave filters blank to exclude them (i.e. a minimum close vote filter of 0 is not the same as leaving the field blank)</li>
-                                        <li>When including a maximum close vote / delete vote filter, a minimum should also be included (if you want useful results)</li>
-                                        <li>Fields whose headers are marked with an asterisk will be excluded from the close vote filters</li>
-                                        <li>The close vote filter is excluded from the delete vote filters</li>
-                                    </ul>
-                                </div>
+                                <div class="review-filters-help-header"><b>Filters:</b> <span class="toggle-indicator">?\u25BC</span></div>
+                                <ul class="review-filters-help">
+                                    <li>Leave filters blank to exclude them</li>
+                                    <li>Close, reopen, and delete vote filters are primary filters.
+                                        <ul>
+                                            <li>Primary filters operate independantly of each other, except when both delete and reopen vote filters are set.</li>
+                                            <li>When both delete and reopen vote filters are set, both will be required of questions matching either filter.</li>
+                                            <li>When including a maximum primary filter a corresponding minimum should also be included to avoid short-circuiting.</li>
+                                        </ul>
+                                    </li>
+                                    <li>The rest of the filters are secondary filters.
+                                        <ul>
+                                            <li>Secondary filters are required of all questions being filtered, except the close date range filters.</li>
+                                            <li>The close date range filters do not apply to open questions.</li>
+                                        </ul>
+                                    </li>
+                                </ul>
                                 <table class="review-filters-table" border="0">
                                     <thead>
                                         <tr>
@@ -263,11 +283,11 @@
                                             <td>Max Views:</td>
                                         </tr>
                                         <tr>
-                                            <td><input class="review-minclosevotes" type="number" min="0" max="4" value=""></td>
+                                            <td><input class="review-minclosevotes" type="number" min="1" max="4" value=""></td>
                                             <td><input class="review-maxclosevotes" type="number" min="0" max="4" value=""></td>
-                                            <td title="Will be ignored for close vote filter"><input class="review-minreopenvotes" type="number" min="0" max="4" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-minreopenvotes" type="number" min="1" max="4" value=""></td>
                                             <td title="Will be ignored for close vote filter"><input class="review-maxreopenvotes" type="number" min="0" max="4" value=""></td>
-                                            <td title="Will be ignored for close vote filter"><input class="review-mindeletevotes" type="number" min="0" value=""></td>
+                                            <td title="Will be ignored for close vote filter"><input class="review-mindeletevotes" type="number" min="1" value=""></td>
                                             <td title="Will be ignored for close vote filter"><input class="review-maxdeletevotes" type="number" min="0" value=""></td>
                                             <td><input class="review-minanswers" type="number" min="0" value=""></td>
                                             <td><input class="review-maxanswers" type="number" min="0" value=""></td>
@@ -331,10 +351,12 @@
 
             const trap = (target, key) => {
                 if (!(key in target)) {
-                    const node  = nodes.wrapper.querySelector(`.review-${ 
+                    const selector = `.review-${ 
                         key.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)
-                           .replace(/_/g,     m => ` ${m.toLowerCase()}`)
-                    }`);
+                           .replace(/_/g,     m => ` .${m.toLowerCase().substr(1)}`)
+                    }`;
+                    const node  = nodes.wrapper.querySelector(selector);
+                    if(!node) console.log(selector);
                     target[key] = node || null;
                 }
             };
@@ -733,13 +755,33 @@
             display(+store.current);
         }, false);
         
-        let open = false;
+        (_ => {
+            let open = false;
+            if(typeof store.filtersToggleOpen !== 'undefined') open = store.filtersToggleOpen;
+            console.log(open);
+            nodes.filters.style.display = open ? '' : 'none';
+            nodes.filtersToggle.textContent = open ? `\u25B2` : `\u25BC`;
+            nodes.filtersToggle.addEventListener('click', _ => {
+                nodes.filters.style.display = open ? 'none' : '';
+                nodes.filtersToggle.textContent = open ? `\u25BC` : `\u25B2`;
+                open = !open;
+                store.filtersToggleOpen = open;
+            }, false);
+        })();
         
-        nodes.filtersToggle.addEventListener('click', _ => {
-            nodes.filters.style.display = open ? "none" : "";
-            nodes.filtersToggle.textContent = open ? `\u25BC` : `\u25B2`;
-            open = !open;
-        }, false);
+        (_ => {
+            let open = true;
+            if(typeof store.filtersHelpOpen !== 'undefined') open = store.filtersHelpOpen;
+            nodes.filtersHelp.style.display = open ? '' : 'none';
+            nodes.filtersHelpHeader_toggleIndicator.textContent = open ? `?\u25BC` : `?\u25B6`;
+            nodes.filtersHelpHeader.addEventListener('click', _  => {
+                nodes.filtersHelp.style.display = open ? 'none' : '';
+                nodes.filtersHelpHeader_toggleIndicator.textContent = open ? `?\u25B6` : `?\u25BC`;
+                open = !open;
+                store.filtersHelpOpen = open;
+            }, false);
+        })();
+            
         
         display(+store.current);
     }
