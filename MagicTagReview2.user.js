@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.7
+// @version      1.0.0.8
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -9,12 +9,50 @@
 // @grant        unsafeWindow
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
 /* globals unsafeWindow, $, GM_setValue, GM_getValue */
-(async _ => {
+
+const addXHRListener = (_ => {
+    const XHR = XMLHttpRequest;
+
+    const listeners = [];
+
+    unsafeWindow.XMLHttpRequest = new Proxy(XHR, {
+        construct: (target, args) => {
+            const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && Object.assign(data, e[type](data))), data);
+
+            const xhr = new XHR();
+
+            return new Proxy(xhr, {
+                get: (t, k) => {
+                    if(typeof xhr[k] === 'function') {
+                        return new Proxy(xhr[k], {
+                            apply: async (target, self, args) => {
+                                const result = await xhr[k](...args);
+                                const data = callall('call', { xhr, 'method': k, 'args': args.join(', '), 'value': result });
+                                return data.value;
+                            }
+                        });
+                    }
+                    const data = callall('get', { xhr, 'property': k, 'value': xhr[k] });
+                    return data.value;
+                },
+                set: (t, k, v) => {
+                    const data = callall('set', { xhr, 'property': k, 'value': v });
+                    xhr[k] = data.value;
+                    return true;
+                }
+            });
+        }
+    });
+
+    return obj => listeners.push(obj); 
+})();
+
+unsafeWindow.onload = async _ => {
     'use strict';
     
     const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
@@ -206,6 +244,15 @@
                     font-weight: bold;
                     font-size:  11px;
                     color: rgb(122, 122, 122);
+                }
+                .review-bar-container {
+                    margin: 0;
+                }
+                div#content {
+                    padding-top: 15px !important;
+                }
+                .review-bar {
+                    margin-bottom: 15px!important;
                 }
             `;
             const HTML = `
@@ -527,7 +574,7 @@
             xhr.addEventListener('load', _ => {
                 if (xhr.status !== 200) {
                     console.log(xhr.status, xhr.statusText, xhr);
-                    resolve(`<h1>${xhr.status} - ${xhr.statusText}</h1><div>${url}</div>`);
+                    resolve([]);
                 } else {
                     resolve(JSON.parse(xhr.responseText));
                 }
@@ -541,7 +588,7 @@
             xhr.addEventListener('load', _ => {
                 if (xhr.status !== 200) {
                     console.log(xhr.status, xhr.statusText, xhr);
-                    resolve([]);
+                    resolve(`<h1>${xhr.status} - ${xhr.statusText}</h1><div>${url}</div>`);
                 } else {
                     resolve(xhr.responseText);
                 }
@@ -595,10 +642,11 @@
                 }, questionInitId);
 
                 const prettyDate = time => {
-                    if (time == null || time.length != 20) return;
+                    if (time === null || time.length != 20) return;
 
                     // firefox requires ISO 8601 formated dates
                     time = time.substr(0, 10) + "T" + time.substr(11, 10);
+                    console.log(time);
                     var date = new Date(time),
                         diff = (((new Date()).getTime() - date.getTime()) / 1000) + StackExchange.options.serverTimeOffsetSec,
                         day_diff = Math.floor(diff / 86400);
@@ -620,6 +668,7 @@
                     let str = '';
                     for(let [k, v] of Object.entries(obj)) {
                         if(excludes.includes(k)) continue;
+                        if (k === 'tags') v = v.join(', ');
                         if (/Object/.test(v.toString())) {
                             if ("display_name" in v && "link" in v) 
                                  v = `<a href="${v.link}">${v.display_name}</a>`;
@@ -627,7 +676,7 @@
                         }
                         if (/date/.test(k)) {
                             const date = new Date(v * 1000).toISOString().replace(/T(.*)\..*/, ' $1Z');
-                            v = `<span class="relativetime" title="${date}">${prettyDate(date)}</span>`;
+                            v = `<span class="relativetime" title="${date}">${prettyDate(date) || date}</span>`;
                         }
                         let h = k.replace(/_/g, ' ');
                         h = h.charAt(0).toUpperCase() + h.slice(1);
@@ -781,8 +830,36 @@
                 store.filtersHelpOpen = open;
             }, false);
         })();
+        
+        addXHRListener({
+            regex: /close\/add/,
+            get: data => {
+                if(data.property === 'responseText') {
+                    console.log(data.xhr.responseText);
+                    const obj = JSON.parse(data.xhr.responseText);
+                    if(!obj.Count) {
+                        Object.assign(obj, {
+                            "Message":"Your vote has been recorded",
+                            "ResultChangedState":false,
+                            "Count":4,
+                            "CountNeededForStateChange":1
+                        });
+                    }
+                    data.value = JSON.stringify(obj);
+                    display(store.current);
+                }
+                return data;
+            }
+        });
+        /* For teh debug porpoises */
+        /*addXHRListener({
+            regex: /./,
+            get: data => console.log(data.xhr.responseURL, 'get', data),
+            set: data => console.log(data.xhr.responseURL, 'set', data),
+            call: data => console.log(data.xhr.responseURL, 'call', data)
+        });*/
             
         
         display(+store.current);
     }
-})();
+};
