@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.9
+// @version      1.0.1.0
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -13,8 +13,42 @@
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
-/* globals unsafeWindow, $, GM_setValue, GM_getValue */
+/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, StackExchange */
+'use strict';
 
+/** Start Reusable Utilities **/
+
+/**
+ * @typedef XHRListener
+ * @type {function}
+ * @param {object} data - Object containing the request object, the property being accessed or method being called, and the value that would be returned
+ * @param {XMLHttpRequest} data.xhr - The request object
+ * @param {string} [data.property] - The property being accessed (get/set)
+ * @param {string} [data.method] - the method being called (call)
+ * @param {*} data.value - The value being returned or set (get/set/call)
+ * @returns {undefined}
+ */
+/**
+ * @typedef XHRListenerObject
+ * @type {object}
+ * @param {RegExp} regex - To be matched against XMLHttpRequest.responseURL in order to execute the listener
+ * @param {XHRListener} [get] - Called when get operations occur on the request object, 
+ * @param {XHRListener} [set] - Called when set operations occur on the request object
+ * @param {XHRListener} [call] - Called when methods of the request object are called
+ */
+/**
+ * @function addXHRListener - Intercepts XMLHttpRequests 
+ * @param {XHRListenerObject} listener
+ * @return {bool} false
+ * @github https://github.com/Tiny-Giant/JS-Examples/blob/master/addXHRListener.js
+ */
+/* For de bug porpoises */
+/*addXHRListener({
+    regex: /./,
+    get: data => console.log(data.xhr.responseURL, 'get', data),
+    set: data => console.log(data.xhr.responseURL, 'set', data),
+    call: data => console.log(data.xhr.responseURL, 'call', data)
+});*/
 const addXHRListener = (_ => {
     const XHR = XMLHttpRequest;
 
@@ -22,7 +56,7 @@ const addXHRListener = (_ => {
 
     unsafeWindow.XMLHttpRequest = new Proxy(XHR, {
         construct: (target, args) => {
-            const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && Object.assign(data, e[type](data))), data);
+            const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && e[type](data)), data);
 
             const xhr = new XHR();
 
@@ -49,46 +83,43 @@ const addXHRListener = (_ => {
         }
     });
 
-    return obj => listeners.push(obj); 
+    return listener => (listeners.push(listener), !0); 
 })();
+    
+const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
+    //Execute a function in the page context.
+    // Using () => doesn't set arguments, so can't use it on this function.
+    // This has to be done without jQuery, as jQuery creates the script
+    // within this context, not the page context, which results in
+    // permission denied to run the function.
+    var newScript = document.createElement('script');
+    if(typeof id === 'string' && id) {
+        newScript.id = id;
+    }
+    var args = [];
+    //using .slice(), or other Array methods, on arguments prevents optimization
+    for(var index=3;index<arguments.length;index++){
+        args.push(arguments[index]);
+    }
+    newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,JSON.parse(\'' + JSON.stringify(args).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'));";
+    document.head.appendChild(newScript);
+    if(!leaveInPage) {
+        //Synchronous scripts are executed immediately and can be immediately removed.
+        //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+        document.head.removeChild(newScript);
+    }
+    return newScript;
+};
+
+/** @Proxy store - Wraps GM_(set/get)value with a prefix to prevent interference with other scripts */
+const store = new Proxy({}, {
+    get: (t, k) => GM_getValue(`MagicTagReview-${ k }`),
+    set: (t, k, v) => (GM_setValue(`MagicTagReview-${ k }`, v), true)
+});
+
+/** End Reusable Utilities **/
 
 unsafeWindow.onload = async _ => {
-    'use strict';
-    
-    const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
-        //Execute a function in the page context.
-        // Using () => doesn't set arguments, so can't use it on this function.
-        // This has to be done without jQuery, as jQuery creates the script
-        // within this context, not the page context, which results in
-        // permission denied to run the function.
-        var newScript = document.createElement('script');
-        if(typeof id === 'string' && id) {
-            newScript.id = id;
-        }
-        var args = [];
-        //using .slice(), or other Array methods, on arguments prevents optimization
-        for(var index=3;index<arguments.length;index++){
-            args.push(arguments[index]);
-        }
-        newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,JSON.parse(\'' + JSON.stringify(args).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'));";
-        document.head.appendChild(newScript);
-        if(!leaveInPage) {
-            //Synchronous scripts are executed immediately and can be immediately removed.
-            //Scripts with asynchronous functionality of any type must remain in the page until all complete.
-            document.head.removeChild(newScript);
-        }
-        return newScript;
-    };
-
-    const inPageInitInlineEditing = inlineEditingInitId => {
-        StackExchange.using('inlineEditing', function () {
-            StackExchange.inlineEditing.init();
-            document.getElementById(inlineEditingInitId).remove();
-        });
-    };
-    const inlineEditingInitId = 'magicTag2-initInlineEditing-' + performance.now();
-    executeInPage(inPageInitInlineEditing, true, inlineEditingInitId, inlineEditingInitId);
-
     if (/^\/?review\/?$/.test(window.location.pathname)) {
         // We are on the review queue list page
         document.querySelector('.dashboard-item').insertAdjacentHTML('beforebegin', `
@@ -106,34 +137,31 @@ unsafeWindow.onload = async _ => {
     } else if (/^\/?review\/custom/.test(window.location.pathname)) {
         // We are on the Magic™ Tag Review page
         document.querySelector('title').textContent = 'Magic™ Tag Review';
+        document.querySelector('#mainbar-full').innerHTML = '';
 
-        const store = new Proxy({}, {
-            get: (t, k) => GM_getValue(`MagicTagReview-${ k }`),
-            set: (t, k, v) => (GM_setValue(`MagicTagReview-${ k }`, v), true)
-        });
-        
+        /** Start Interface **/
+
         const nodes = (_ => {
-            const scope = Object.assign(document.querySelector('#mainbar-full'), { innerHTML: '' });
+            const scope = document.querySelector('#mainbar-full');
             const wrapper = scope.appendChild(Object.assign(document.createElement('span'), { className: 'review-bar-wrapper'  }));
             const CSS = `
                 body {
                     overflow-y: scroll;
                 }
-                .review-indicator-wrapper {
+                .review-indicator {
                     padding-left: 5px;
                     display: inline-block;
                     vertical-align: middle;
                 }
-                .review-spinner,
-                .review-indicator {
+                .review-spinner {
                     display: inline-block;
                     vertical-align: middle;
+                    height: 30px;
                 }
-                .review-spinner {
-                    height: 40px;
-                }
-                .review-indicator {
-                    font-size: 13px !important;
+                .review-indicator .progress,
+                .review-indicator .quota {
+                    font-size: 11px;
+                    height: 15px;
                 }
                 .review-bar-container .review-bar {
                     white-space: nowrap;
@@ -144,14 +172,19 @@ unsafeWindow.onload = async _ => {
                 }
                 .review-bar-container .review-bar input {
                     font-size: 13px;
+                }
+                .review-bar input,
+                .review-bar select {
+                    margin: 0px;
+                    display: inline-block;
                     vertical-align: middle;
+                    box-sizing: border-box;
+                    height: 35px;
                 }
-                .review-bar input {
-                    margin: 0px;
-                    margin-left: 5px
-                }
-                .review-bar input.review-tagged {
-                    margin: 0px;
+                .review-bar select {
+                    font-size: 13px;
+                    line-height: 30px;
+                    border-color: rgb(200, 204, 208);
                 }
                 .review-form {
                     display: inline-block
@@ -208,17 +241,11 @@ unsafeWindow.onload = async _ => {
                     background: #eee;
                     cursor: pointer;
                 }
-                .review-form select {
-                    font-size: 13px;
-                    line-height: 30px;
-                    display:  inline-block;
-                    height: 33px;
-                    vertical-align:  middle;
-                }
                 .review-bar-top {
                     overflow: hidden;
                 }
                 .review-form {
+                    white-space: nowrap;
                     float: left;
                 }
                 .review-top-right {
@@ -254,6 +281,13 @@ unsafeWindow.onload = async _ => {
                 .review-bar {
                     margin-bottom: 15px!important;
                 }
+                .review-indicator .quota {
+                    font-size: 11px;
+                }
+                .review-position {
+                    text-align: center;
+                    width: 50px;
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
@@ -263,8 +297,7 @@ unsafeWindow.onload = async _ => {
                             <form class="review-form">
                                 <input class="review-tagged" type="text" placeholder="tag">
                                 <select class="review-sort">
-                                    <option selected disabled>sort</option>
-                                    <option value="activity">activity</option>
+                                    <option selected value="activity">activity</option>
                                     <option value="votes">votes</option>
                                     <option value="creation">creation</option>
                                     <option value="hot">hot</option>
@@ -272,19 +305,20 @@ unsafeWindow.onload = async _ => {
                                     <option value="month">month</option>
                                 </select>
                                 <select class="review-order">
-                                    <option selected disabled>order</option>
+                                    <option selected value="desc">desc</option>
                                     <option value="asc">asc</option>
-                                    <option value="desc">desc</option>
                                 </select>
                                 <input class="review-fetch" type="submit" value="Fetch">
                                 <input class="review-stop" type="button" value="Stop" disabled="">
+                                <img class="review-spinner" src="https://i.stack.imgur.com/ccvLD.gif" style="display: none">
+                                <div class="review-indicator">
+                                    <div class="progress"></div>
+                                    <div class="quota"></div>
+                                </div>
                             </form>
                             <div class="review-top-right">
-                                <div class="review-indicator-wrapper">
-                                    <img class="review-spinner" src="https://i.stack.imgur.com/MJFrt.gif" style="display: none">
-                                    <span class="review-indicator">Reviewing question 2 of 5</span>
-                                </div>
                                 <input class="review-prev" type="button" value="Previous">
+                                <input class="review-position" type="text" readonly value="0/0">
                                 <input class="review-next" type="button" value="Next">
                             </div>
                         </div>
@@ -413,10 +447,27 @@ unsafeWindow.onload = async _ => {
                 has: (target, key) => (trap(target, key), !!target[key]),
             });
         })();
-
-        let queue         = JSON.parse(store.queue         || '[]'),
-            question_list = JSON.parse(store.question_list || '[]');
         
+        nodes.spinner.show = _ => nodes.spinner.style.display = '';
+        nodes.spinner.hide = _ => nodes.spinner.style.display = 'none';
+
+        /** End Interface **/
+
+        /** Start Initialization **/
+
+        const inPageInitInlineEditing = inlineEditingInitId => {
+            StackExchange.using('inlineEditing', function () {
+                StackExchange.inlineEditing.init();
+                document.getElementById(inlineEditingInitId).remove();
+            });
+        };
+        const inlineEditingInitId = 'magicTag2-initInlineEditing-' + performance.now();
+        executeInPage(inPageInitInlineEditing, true, inlineEditingInitId, inlineEditingInitId);
+
+        let stop          = false,
+            queue         = JSON.parse(store.queue              || '[]'),
+            question_list = JSON.parse(store.question_list      || '[]');
+
         nodes.tagged           .value = store.tagged            || '';
         nodes.sort             .value = store.sort              || '';
         nodes.order            .value = store.order             || '';
@@ -442,9 +493,10 @@ unsafeWindow.onload = async _ => {
         nodes.editdateend      .value = store.editdateend       || '';
         nodes.includestags     .value = store.includestags      || '';
         nodes.excludestags     .value = store.excludestags      || '';
-        
-        nodes.spinner.show = _ => nodes.spinner.style.display = '';
-        nodes.spinner.hide = _ => nodes.spinner.style.display = 'none';
+
+        /** End Initialization **/
+
+        /** Start Functions **/
 
         const reset = (q, f, c) => {
             if(q) {
@@ -452,6 +504,7 @@ unsafeWindow.onload = async _ => {
                 question_list = [];
                 store.queue         = '[]';
                 store.question_list = '[]';
+                nodes.indicator_quota.textContent = '';
             }
             if(f) {
                 nodes.tagged           .value = '';
@@ -494,16 +547,12 @@ unsafeWindow.onload = async _ => {
             nodes.stop.disabled         = true;
             nodes.prev.disabled         = true;
             nodes.next.disabled         = true;
-            nodes.indicator.textContent = '';
+            nodes.indicator_progress.textContent  = '';
         };
-        
-        let stop = false;
-        
-        nodes.stop.addEventListener('click', _ => stop = true);
 
         const retrieve = _ => new Promise(async (resolve, reject) => {
             if(!nodes.tagged.value) {
-                nodes.indicator.textContent = 'Tag is required';
+                nodes.indicator_progress.textContent = 'Tag is required';
                 return;
             }
             
@@ -522,7 +571,8 @@ unsafeWindow.onload = async _ => {
             let page = 1, totalpages = 1, url;
         
             while(page <= totalpages && result.quota_remaining !== 0 && !result.backoff && stop === false) {
-                nodes.indicator.textContent = `Retrieving question list (page ${page} of ${(totalpages||1)})`;
+                nodes.indicator_progress.textContent = `Retrieving question list (page ${page} of ${(totalpages||1)})`;
+                nodes.indicator_quota   .textContent = `API Quota remaining: ${result.quota_remaining}`;
                 url = `${location.protocol}//api.stackexchange.com/2.2/questions?${[
                     `page=${page++}`,
                     'pagesize=100',
@@ -553,14 +603,14 @@ unsafeWindow.onload = async _ => {
             nodes.spinner.hide();
             nodes.fetch.disabled = true;
             nodes.stop.disabled = true;
-            nodes.indicator.textContent = '';
+            nodes.indicator_progress.textContent = '';
             stop = false;
             
             delete result.items;
             console.log(result, url);
             
             if(result.quota_remaining === 0) {
-                nodes.indicator.textContent = "No requests left, wait until next UTC day.";
+                nodes.indicator_quota.textContent = "No requests left, wait until next UTC day.";
             }
             
             console.log('Quota remaining: ' + result.quota_remaining);
@@ -693,7 +743,7 @@ unsafeWindow.onload = async _ => {
             
             nodes.prev.disabled = !queue.length || current < 1;
             nodes.next.disabled = !queue.length || current === queue.length - 1;
-            nodes.indicator.textContent = queue.length ? 'Reviewing question ' + (current + 1) + ' of ' + queue.length : 'No questions to review';
+            nodes.position.value = queue.length ? `${current + 1}/${queue.length}` : '0/0';
         });
         
         const filterQuestions = question_list => {
@@ -777,7 +827,12 @@ unsafeWindow.onload = async _ => {
             
             return queue;
         };
+
+        /** End Functions **/
         
+        /** Start Event Listeners **/
+        nodes.stop.addEventListener('click', _ => stop = true);
+
         nodes.form.addEventListener('submit', async event => {
             event.preventDefault();
             question_list = await retrieve();
@@ -830,7 +885,9 @@ unsafeWindow.onload = async _ => {
                 store.filtersHelpOpen = open;
             }, false);
         })();
+        /** End Event Listeners **/
         
+        // Prevent reload on post state change, reload post instead.
         addXHRListener({
             regex: /close\/add/,
             get: data => {
@@ -848,17 +905,8 @@ unsafeWindow.onload = async _ => {
                         display(store.current);
                     }
                 }
-                return data;
             }
         });
-        /* For teh debug porpoises */
-        /*addXHRListener({
-            regex: /./,
-            get: data => console.log(data.xhr.responseURL, 'get', data),
-            set: data => console.log(data.xhr.responseURL, 'set', data),
-            call: data => console.log(data.xhr.responseURL, 'call', data)
-        });*/
-            
         
         display(+store.current);
     }
