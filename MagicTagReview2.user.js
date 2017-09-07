@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.0.8
+// @version      1.0.0.9
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -844,9 +844,9 @@ unsafeWindow.onload = async _ => {
                             "Count":4,
                             "CountNeededForStateChange":1
                         });
+                        data.value = JSON.stringify(obj);
+                        display(store.current);
                     }
-                    data.value = JSON.stringify(obj);
-                    display(store.current);
                 }
                 return data;
             }
