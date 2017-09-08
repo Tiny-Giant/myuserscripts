@@ -744,6 +744,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     return str;
                 };
                 
+                nodes.information.innerHTML = '';
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
                 const snippetInitId = 'magicTag2-initSnippetRenderer-' + performance.now();
                 executeInPage(inPageInitSnippetRenderer, true, snippetInitId , snippetInitId);
