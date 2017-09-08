@@ -9,11 +9,12 @@
 // @grant        unsafeWindow
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_addValueChangeListener
 // @run-at       document-start
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
-/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, StackExchange */
+/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, GM_addValueChangeListener, StackExchange */
 'use strict';
 
 /** Start Reusable Utilities **/
@@ -42,6 +43,45 @@
  * @return {bool} false
  * @github https://github.com/Tiny-Giant/JS-Examples/blob/master/addXHRListener.js
  */
+/* Unfortunately, because greasemonkey sucks, this does not work in greasemonkey, use tampermonkey instead */
+const addXHRListener = (_ => {
+    const XHR = unsafeWindow.XMLHttpRequest;
+
+    const listeners = [];
+    
+    if('undefined' !== typeof GM_info.script.author) {
+        unsafeWindow.XMLHttpRequest = new Proxy(XHR, {
+            construct: (target, args) => {
+                const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && e[type](data)), data);
+
+                const xhr = new XHR();
+
+                return new Proxy(xhr, {
+                    get: (t, k) => {
+                        if(typeof xhr[k] === 'function') {
+                            return new Proxy(xhr[k], {
+                                apply: async (target, self, args) => {
+                                    const result = await xhr[k](...args);
+                                    const data = callall('call', { xhr, 'method': k, 'args': args.join(', '), 'value': result });
+                                    return data.value;
+                                }
+                            });
+                        }
+                        const data = callall('get', { xhr, 'property': k, 'value': xhr[k] });
+                        return data.value;
+                    },
+                    set: (t, k, v) => {
+                        const data = callall('set', { xhr, 'property': k, 'value': v });
+                        xhr[k] = data.value;
+                        return true;
+                    }
+                });
+            }
+        });
+    }
+
+    return listener => (listeners.push(listener), !0);
+})();
 /* For de bug porpoises */
 /*addXHRListener({
     regex: /./,
@@ -49,42 +89,6 @@
     set: data => console.log(data.xhr.responseURL, 'set', data),
     call: data => console.log(data.xhr.responseURL, 'call', data)
 });*/
-const addXHRListener = (_ => {
-    const XHR = XMLHttpRequest;
-
-    const listeners = [];
-
-    unsafeWindow.XMLHttpRequest = new Proxy(XHR, {
-        construct: (target, args) => {
-            const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && e[type](data)), data);
-
-            const xhr = new XHR();
-
-            return new Proxy(xhr, {
-                get: (t, k) => {
-                    if(typeof xhr[k] === 'function') {
-                        return new Proxy(xhr[k], {
-                            apply: async (target, self, args) => {
-                                const result = await xhr[k](...args);
-                                const data = callall('call', { xhr, 'method': k, 'args': args.join(', '), 'value': result });
-                                return data.value;
-                            }
-                        });
-                    }
-                    const data = callall('get', { xhr, 'property': k, 'value': xhr[k] });
-                    return data.value;
-                },
-                set: (t, k, v) => {
-                    const data = callall('set', { xhr, 'property': k, 'value': v });
-                    xhr[k] = data.value;
-                    return true;
-                }
-            });
-        }
-    });
-
-    return listener => (listeners.push(listener), !0); 
-})();
     
 const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
     //Execute a function in the page context.
@@ -119,7 +123,7 @@ const store = new Proxy({}, {
 
 /** End Reusable Utilities **/
 
-unsafeWindow.onload = async _ => {
+document.addEventListener('DOMContentLoaded', async _ => {
     if (/^\/?review\/?$/.test(window.location.pathname)) {
         // We are on the review queue list page
         document.querySelector('.dashboard-item').insertAdjacentHTML('beforebegin', `
@@ -127,17 +131,25 @@ unsafeWindow.onload = async _ => {
                 <div class="dashboard-count"></div>
                 <div class="dashboard-summary">
                     <div class="dashboard-summary">
-                        <div class="dashboard-title"><a href="/review/custom?noredirect=1">Magic™ Tag Review</a></div>
+                        <div class="dashboard-title"><a href="/review/MagicTagReview">Magic™ Tag Review</a></div>
                         <div class="dashboard-description">Concentrated tag review with options to filter by close votes or delete votes.</div>
                     </div>
                 </div>
                 <br class="cbt">
             </div>
         `);
-    } else if (/^\/?review\/custom/.test(window.location.pathname)) {
+    } else if (/^\/?review\/MagicTagReview/.test(window.location.pathname)) {
         // We are on the Magic™ Tag Review page
         document.querySelector('title').textContent = 'Magic™ Tag Review';
         document.querySelector('#mainbar-full').innerHTML = '';
+        
+        if(!('$' in window)) {
+            window.$ = unsafeWindow.$;
+        }
+        
+        if(!('StackExchange' in window)) {
+            window.StackExchange = unsafeWindow.StackExchange;
+        }
 
         /** Start Interface **/
 
@@ -613,8 +625,6 @@ unsafeWindow.onload = async _ => {
                 nodes.indicator_quota.textContent = "No requests left, wait until next UTC day.";
             }
             
-            console.log('Quota remaining: ' + result.quota_remaining);
-            
             resolve(question_list);
         });
 
@@ -696,7 +706,6 @@ unsafeWindow.onload = async _ => {
 
                     // firefox requires ISO 8601 formated dates
                     time = time.substr(0, 10) + "T" + time.substr(11, 10);
-                    console.log(time);
                     var date = new Date(time),
                         diff = (((new Date()).getTime() - date.getTime()) / 1000) + StackExchange.options.serverTimeOffsetSec,
                         day_diff = Math.floor(diff / 86400);
@@ -862,7 +871,6 @@ unsafeWindow.onload = async _ => {
         (_ => {
             let open = false;
             if(typeof store.filtersToggleOpen !== 'undefined') open = store.filtersToggleOpen;
-            console.log(open);
             nodes.filters.style.display = open ? '' : 'none';
             nodes.filtersToggle.textContent = open ? `\u25B2` : `\u25BC`;
             nodes.filtersToggle.addEventListener('click', _ => {
@@ -910,4 +918,4 @@ unsafeWindow.onload = async _ => {
         
         display(+store.current);
     }
-};
+}, false);
