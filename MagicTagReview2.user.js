@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.1.1
+// @version      1.0.1.2
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
@@ -14,7 +14,7 @@
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
-/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, GM_addValueChangeListener, StackExchange */
+/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, StackExchange, GM_info */
 'use strict';
 
 /** Start Reusable Utilities **/
@@ -246,6 +246,11 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     width: 100%;
                     box-sizing:  border-box;
                 }
+                .review-filters input[type="button"],
+                .review-filters input[type="submit"] {
+                    width: auto;
+                    float: right;
+                }
                 .review-filters {
                     font-size: 12px;
                 }
@@ -328,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                                     <div class="quota"></div>
                                 </div>
                             </form>
-                            <div class="review-top-right">
+                            <div class="review-top-right review-actions">
                                 <input class="review-prev" type="button" value="Previous">
                                 <input class="review-position" type="text" readonly value="0/0">
                                 <input class="review-next" type="button" value="Next">
@@ -419,7 +424,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
                                         </tr>
                                         <tr>
                                             <td colspan="10"></td>
-                                            <td colspan="2"><input class="review-apply-filters" type="submit" value="Apply filters"></td>
+                                            <td colspan="2"><input class="review-stop-filter" type="button" value="Stop" disabled>
+                                                            <input class="review-apply-filters" type="submit" value="Apply Filters"></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -648,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             xhr.addEventListener('load', _ => {
                 if (xhr.status !== 200) {
                     console.log(xhr.status, xhr.statusText, xhr);
-                    resolve(`<h1>${xhr.status} - ${xhr.statusText}</h1><div>${url}</div>`);
+                    resolve(`<h1>${xhr.status} - ${xhr.statusText}</h1><div>${post.question_id}</div>`);
                 } else {
                     resolve(xhr.responseText);
                 }
@@ -728,17 +734,20 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     for(let [k, v] of Object.entries(obj)) {
                         if(excludes.includes(k)) continue;
                         if (k === 'tags') v = v.join(', ');
+                        let h = k.replace(/_/g, ' ');
+                        h = h.charAt(0).toUpperCase() + h.slice(1);
                         if (/Object/.test(v.toString())) {
-                            if ("display_name" in v && "link" in v) 
+                            if ("display_name" in v && "link" in v)  {
                                  v = `<a href="${v.link}">${v.display_name}</a>`;
-                            else v = buildInfo(v);
+                            } else {
+                                str += `<div class="spacer review-info"><label class="left">${h}:</label>&nbsp;${buildInfo(v)}</div>`;
+                                continue;
+                            }
                         }
                         if (/date/.test(k)) {
                             const date = new Date(v * 1000).toISOString().replace(/T(.*)\..*/, ' $1Z');
                             v = `<span class="relativetime" title="${date}">${prettyDate(date) || date}</span>`;
                         }
-                        let h = k.replace(/_/g, ' ');
-                        h = h.charAt(0).toUpperCase() + h.slice(1);
                         str += `<div class="spacer review-info"><label class="left">${h}:</label> <span class="right">${v}</span></div>`;
                     }
                     return str;
@@ -756,8 +765,13 @@ document.addEventListener('DOMContentLoaded', async _ => {
             nodes.position.value = queue.length ? `${current + 1}/${queue.length}` : '0/0';
         });
         
-        const filterQuestions = question_list => {
+        const delay = _ => new Promise(resolve => setTimeout(resolve));
+        
+        const filterQuestions = async question_list => {
             reset(0,0,1);
+            nodes.spinner.show();
+            nodes.applyFilters.disabled = true;
+            nodes.stopFilter.disabled = false;
         
             store.minclose          = nodes.minclosevotes    .value ? +nodes.minclosevotes   .value : '';
             store.maxclose          = nodes.maxclosevotes    .value ? +nodes.maxclosevotes   .value : '';
@@ -821,17 +835,49 @@ document.addEventListener('DOMContentLoaded', async _ => {
             
             const filter = e => Object.entries(filters).reduce((m, [k, v]) => Object.assign(m, {[k]: v(e)}), {});
             
-            const queue = question_list.filter(e => {
+            const queue = await new Promise(async resolve => {
+                const queue = [];
                 
-                const r = filter(e);
+                const isset = {
+                    close : store.minclose  !== '' || store.maxclose  !== '',
+                    delete: store.mindelete !== '' || store.maxdelete !== '',
+                    reopen: store.minreopen !== '' || store.maxreopen !== ''
+                }
+            
+                for(const [i, e] of Object.entries(question_list)) {
+                    await delay();
+                    
+                    if(stop) {
+                        stop = !stop;
+                        break;
+                    }
+                    
+                    nodes.indicator_progress.textContent = `Filtering question ${+i + 1} of ${question_list.length}`;
+
+                    const r = filter(e);
+                    
+                    const secondary_filters = ['inanswerrange','inscorerange','inviewsrange','inaskeddaterange','inactivitydaterange','ineditdaterange','includestags','excludestags'].every(e => r[e]);
+                    
+                    if(!secondary_filters) continue;
+                    
+                    const primary_filters = {
+                        close  :  isset.close  && r.incloserange,
+                        delete :  isset.delete && ['indeleterange','inreopenrange','inclosedaterange'].every(e => r[e]),
+                        reopen :  isset.reopen && ['inreopenrange','inclosedaterange'].every(r => r[e]),
+                        default: !isset.delete && !isset.close && !isset.reopen && r.inclosedaterange
+                    };
+                    
+                    if(Object.values(primary_filters).some(e => e)) queue.push(Object.assign(e, {primary_filters}));
+                }
                 
-                if(!r.inanswerrange || !r.inscorerange || !r.inviewsrange || !r.inaskeddaterange || !r.inactivitydaterange || !r.ineditdaterange || !r.includestags || !r.excludestags) return false;
-                
-                if( ((store.minclose  !== '' || store.maxclose  !== '') && r.incloserange                                                                                     ) ||
-                    ((store.mindelete !== '' || store.maxdelete !== '') && r.indeleterange && r.inreopenrange && r.inclosedaterange                                           ) ||
-                    ((store.minreopen !== '' || store.maxreopen !== '') && r.inreopenrange && r.incloserange  && r.inclosedaterange                                           ) ||
-                    ( store.mindelete === '' && store.maxdelete === ''  && store.minclose  === '' && store.maxclose  === ''  && store.minreopen === '' && store.maxreopen === '' && r.inclosedaterange) )  return true;
+                resolve(queue);
             });
+            
+            nodes.spinner.hide();
+            nodes.applyFilters.disabled = false;
+            nodes.stopFilter.disabled = true;
+            nodes.indicator_progress.textContent = '';
+            stop = false;
             
             console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
             
@@ -842,19 +888,20 @@ document.addEventListener('DOMContentLoaded', async _ => {
         
         /** Start Event Listeners **/
         nodes.stop.addEventListener('click', _ => stop = true);
+        nodes.stopFilter.addEventListener('click', _ => stop = true);
 
         nodes.form.addEventListener('submit', async event => {
             event.preventDefault();
             question_list = await retrieve();
             store.question_list = JSON.stringify(question_list);
-            queue = filterQuestions(question_list);
+            queue = await filterQuestions(question_list);
             store.queue = JSON.stringify(queue);
             display(+store.current);
         });
         
-        nodes.filtersForm.addEventListener('submit', event => {
+        nodes.filtersForm.addEventListener('submit', async event => {
             event.preventDefault();
-            queue = filterQuestions(question_list);
+            queue = await filterQuestions(question_list);
             store.queue = JSON.stringify(queue);
             display(+store.current);
         }, false);
