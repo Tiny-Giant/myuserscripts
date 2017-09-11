@@ -6,7 +6,6 @@
 // @author       @TinyGiant
 // @contributor  @Makyen
 // @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
-// @grant        unsafeWindow
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addValueChangeListener
@@ -14,10 +13,82 @@
 // ==/UserScript==
 /* jshint -W097 */
 /* jshint esnext: true */
-/* globals $, unsafeWindow, $, GM_setValue, GM_getValue, StackExchange, GM_info */
+/* globals $, GM_setValue, GM_getValue, StackExchange, GM_info */
 'use strict';
 
 /** Start Reusable Utilities **/
+        
+const executeInPage = function(functionToRunInPage, leaveInPage, id) {
+    //Execute a function in the page context.
+    // Any additional arguments for this function are passed into the page to the functionToRunInPage.
+    // Such arguments must be JSON-ifiable (also Date, Function, and RegExp) (prototypes are not copied).
+    // Using () => doesn't set arguments, so can't use it to define this function.
+    // This has to be done without jQuery, as jQuery creates the script
+    // within this context, not the page context, which results in
+    // permission denied to run the function.
+    function convertToText(args) {
+        //This uses the fact that the arguments are converted to text which is interpreted
+        //  within a <script>. That means we can create other types of objects by recreating their
+        //  normal JavaScript representation.
+        //  It's actually easier to do this without JSON.strigify() for the whole Object/Array.
+        var asText = '';
+        var level = 0;
+        function lineSeparator(adj, isntLast) {
+            level += adj - ((typeof isntLast === 'undefined' || isntLast) ? 0 : 1);
+            asText += (isntLast ? ',' : '') + '\n' + (new Array(level * 2 + 1)).join('');
+        }
+        function recurseObject(obj) {
+            if (Array.isArray(obj)) {
+                asText += '[';
+                lineSeparator(1);
+                obj.forEach(function(value, index, array) {
+                    recurseObject(value);
+                    lineSeparator(0, index !== array.length - 1);
+                });
+                asText += ']';
+            } else if (obj === null) {
+                asText +='null';
+            } else if (obj instanceof RegExp || typeof obj === 'function') {
+                asText +=  obj.toString();
+            } else if (obj instanceof Date) {
+                asText += 'new Date("' + obj.toJSON() + '")';
+            } else if (typeof obj === 'object') {
+                asText += '{';
+                lineSeparator(1);
+                Object.keys(obj).forEach(function(prop, index, array) {
+                    asText += JSON.stringify(prop) + ': ';
+                    recurseObject(obj[prop]);
+                    lineSeparator(0, index !== array.length - 1);
+                });
+                asText += '}';
+            } else if (['boolean', 'number', 'string'].indexOf(typeof obj) > -1) {
+                asText += JSON.stringify(obj);
+            } else {
+                console.log('Didn\'t handle: typeof obj:', typeof obj, '::  obj:', obj);
+            }
+        }
+        recurseObject(args);
+        return asText;
+    }
+    var newScript = document.createElement('script');
+    if(typeof id === 'string' && id) {
+        newScript.id = id;
+    }
+    var args = [];
+    //using .slice(), or other Array methods, on arguments prevents optimization
+    for(var index=3;index<arguments.length;index++){
+        args.push(arguments[index]);
+    }
+    newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,' + convertToText(args) + ");";
+    (document.head || document.documentElement).appendChild(newScript);
+    if(!leaveInPage) {
+        //Synchronous scripts are executed immediately and can be immediately removed.
+        //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+        document.head.removeChild(newScript);
+    }
+    return newScript;
+};
+
 
 /**
  * @typedef XHRListener
@@ -43,14 +114,13 @@
  * @return {bool} false
  * @github https://github.com/Tiny-Giant/JS-Examples/blob/master/addXHRListener.js
  */
-/* Unfortunately, because greasemonkey sucks, this does not work in greasemonkey, use tampermonkey instead */
-const addXHRListener = (_ => {
-    const XHR = unsafeWindow.XMLHttpRequest;
+const inPageAddXHRListener = listen => {
+    window.addXHRListener = (_ => {
+        const XHR = XMLHttpRequest;
 
-    const listeners = [];
-    
-    if('undefined' !== typeof GM_info.script.author) {
-        unsafeWindow.XMLHttpRequest = new Proxy(XHR, {
+        const listeners = [];
+        
+        XMLHttpRequest = new Proxy(XHR, {
             construct: (target, args) => {
                 const callall = (type, data) => (listeners.forEach(e => type in e && e.regex.test(xhr.responseURL) && e[type](data)), data);
 
@@ -78,10 +148,10 @@ const addXHRListener = (_ => {
                 });
             }
         });
-    }
 
-    return listener => (listeners.push(listener), !0);
-})();
+        return listener => (listeners.push(listener), !0);
+    })();
+};
 /* For de bug porpoises */
 /*addXHRListener({
     regex: /./,
@@ -89,31 +159,7 @@ const addXHRListener = (_ => {
     set: data => console.log(data.xhr.responseURL, 'set', data),
     call: data => console.log(data.xhr.responseURL, 'call', data)
 });*/
-    
-const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any additional JSON-ifiable arguments for functionToRunInPage
-    //Execute a function in the page context.
-    // Using () => doesn't set arguments, so can't use it on this function.
-    // This has to be done without jQuery, as jQuery creates the script
-    // within this context, not the page context, which results in
-    // permission denied to run the function.
-    var newScript = document.createElement('script');
-    if(typeof id === 'string' && id) {
-        newScript.id = id;
-    }
-    var args = [];
-    //using .slice(), or other Array methods, on arguments prevents optimization
-    for(var index=3;index<arguments.length;index++){
-        args.push(arguments[index]);
-    }
-    newScript.textContent = '(' + functionToRunInPage.toString() + ').apply(null,JSON.parse(\'' + JSON.stringify(args).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'));";
-    document.head.appendChild(newScript);
-    if(!leaveInPage) {
-        //Synchronous scripts are executed immediately and can be immediately removed.
-        //Scripts with asynchronous functionality of any type must remain in the page until all complete.
-        document.head.removeChild(newScript);
-    }
-    return newScript;
-};
+executeInPage(inPageAddXHRListener, true, 'magicTagReview-addXHRListener');
 
 /** @Proxy store - Wraps GM_(set/get)value with a prefix to prevent interference with other scripts */
 //Use an in-script cache for what's being stored to GM storage. A side effect is that updates in other tabs
@@ -130,6 +176,48 @@ const store = new Proxy({}, {
     //  This is not the case in Firefox/Tampermonkey or Firefox/Greasemonkey.
     set: (t, k, v) => (storageCache[k] = v, GM_setValue(`MagicTagReview-${ k }`, storageCache[k]), true)
 });
+
+/*Get values from in-page window properties (e.g. window.StackExchange...)
+ * To get the value you do something like:
+ *   (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue)
+ * Doing so sends a CustomEvent to the page context asking for the value. The value
+ *  is returned in JSON format in another CustomEvent, parsed and stored in
+ *  returnedPageValue. This is synchronous, so it's immediately available.
+ */
+const inPageReplyWithPageValue = () => {
+    window.addEventListener('magicTagReview-getPageValue', e => {
+        e.stopPropagation();
+        //Send the value back.
+        window.dispatchEvent(new CustomEvent('magicTagReview-pageValueReturn', {
+            bubbles: true,
+            cancelable: true,
+            detail: JSON.stringify(e.detail.split('.').reduce((sum, prop) => {
+                var type = typeof sum;
+                if (type === 'object' || type === 'function') {
+                    return sum[prop];
+                } //else
+                return sum;
+            }, window))
+        }));
+    }, true);
+};
+executeInPage(inPageReplyWithPageValue, true, 'magicTagReview-pageValueReturner');
+
+var returnedPageValue;
+const getPageValue = (valueText) => {
+    //Request a page value;
+    window.dispatchEvent(new CustomEvent('magicTagReview-getPageValue', {
+        bubbles: true,
+        cancelable: true,
+        detail: valueText
+    }));
+};
+window.addEventListener('magicTagReview-pageValueReturn', e => {
+    e.stopPropagation();
+    //Receive the value from the page and assign it to the global variable.
+    returnedPageValue = JSON.parse(e.detail);
+});
+
 
 /** End Reusable Utilities **/
 
@@ -153,14 +241,6 @@ document.addEventListener('DOMContentLoaded', async _ => {
         document.querySelector('title').textContent = 'Magic™ Tag Review';
         document.querySelector('#mainbar-full').innerHTML = '';
         
-        if(!('$' in window)) {
-            window.$ = unsafeWindow.$;
-        }
-        
-        if(!('StackExchange' in window)) {
-            window.StackExchange = unsafeWindow.StackExchange;
-        }
-
         /** Start Interface **/
 
         const nodes = (_ => {
@@ -568,7 +648,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 store.current = 0;
             }
 
-            $(document).off("click", ".post-menu a.short-link");
+            executeInPage( _ => $(document).off("click", ".post-menu a.short-link"));
             nodes.task.style.display    = 'none';
             nodes.information.innerHTML = '';
             nodes.question.innerHTML    = '';
@@ -738,7 +818,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     // firefox requires ISO 8601 formated dates
                     time = time.substr(0, 10) + "T" + time.substr(11, 10);
                     var date = new Date(time),
-                        diff = (((new Date()).getTime() - date.getTime()) / 1000) + StackExchange.options.serverTimeOffsetSec,
+                        diff = (((new Date()).getTime() - date.getTime()) / 1000) + (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue),
                         day_diff = Math.floor(diff / 86400);
 
                     if (isNaN(day_diff) || day_diff < 0 || day_diff >= 31)
@@ -1016,8 +1096,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
         })();
         /** End Event Listeners **/
         
-        // Prevent reload on post state change, reload post instead.
-        addXHRListener({
+        // Prevent reloading the page on post state change; reload post instead.
+        executeInPage(listener => addXHRListener(listener), true, 'magicTagReview-addXHRListener-preventReloadOnClose', {
             regex: /close\/add/,
             get: data => {
                 if(data.property === 'responseText') {
@@ -1031,11 +1111,15 @@ document.addEventListener('DOMContentLoaded', async _ => {
                             "CountNeededForStateChange":1
                         });
                         data.value = JSON.stringify(obj);
-                        display(store.current);
+                        window.dispatchEvent(new CustomEvent('magicTagReview-userCloseVoted', {
+                            bubbles: true,
+                            cancelable: true
+                        }));
                     }
                 }
             }
         });
+        window.addEventListener('magicTagReview-userCloseVoted', e => display(store.current), true);
         
         display(+store.current);
     }
