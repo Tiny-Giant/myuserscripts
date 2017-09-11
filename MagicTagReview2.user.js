@@ -305,6 +305,9 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     text-align: center;
                     width: 50px;
                 }
+                .review-didCloseVote {
+                    color: red;
+                }
             `;
             const HTML = `
                 <div class="review-bar-container">
@@ -669,17 +672,29 @@ document.addEventListener('DOMContentLoaded', async _ => {
             StackExchange.using('inlineEditing', function () {
                 StackExchange.ready(function () {
                     StackExchange.question.init(initInfo);
+                    var title = document.querySelector('.review-title');
+                    var didCloseVote = title.parentNode.querySelector('.review-didCloseVoteFull');
+                    if (document.querySelector('a[title^="You voted to close"]')) {
+                        if(didCloseVote) {
+                            didCloseVote.style.display = '';
+                        } else {
+                            if(title) {
+                                title.insertAdjacentHTML('afterend','<span class="review-didCloseVoteFull"> - <span class="review-didCloseVote">Voted</span></span>');
+                            }
+                        }
+                    } else {
+                        if(didCloseVote) {
+                            didCloseVote.style.display = 'none';
+                        }
+                    }
                     StackExchange.comments.loadAll($('.question'));
-                    //Remove the <script> this was loaded in.
-                    document.getElementById(questionInitId).remove();
+                    StackExchange.using("snippets", function () {
+                        StackExchange.snippets.initSnippetRenderer();
+                        StackExchange.snippets.redraw();
+                        //Remove the <script> this was loaded in.
+                        document.getElementById(questionInitId).remove();
+                    });
                 });
-            });
-        };
-
-        const inPageInitSnippetRenderer = snippetInitId => {
-            StackExchange.using("snippets", function () {
-                StackExchange.snippets.initSnippetRenderer();
-                document.getElementById(snippetInitId).remove();
             });
         };
 
@@ -691,10 +706,6 @@ document.addEventListener('DOMContentLoaded', async _ => {
             if (post) {
                 nodes.title.href      = 'http://stackoverflow.com/q/' + post.question_id;
                 nodes.title.innerHTML = post.title;
-
-                if (document.querySelector('a[title^="You voted to close"]')) {
-                    nodes.title.textContent += ' - <span style="color:red">Voted</span>';
-                }
 
                 nodes.question.innerHTML = await fetchQuestion(post);
 
@@ -755,8 +766,6 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 
                 nodes.information.innerHTML = '';
                 nodes.information.insertAdjacentHTML('beforeend', buildInfo(post));
-                const snippetInitId = 'magicTag2-initSnippetRenderer-' + performance.now();
-                executeInPage(inPageInitSnippetRenderer, true, snippetInitId , snippetInitId);
                 nodes.task.style.display="";
             }
             
