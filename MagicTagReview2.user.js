@@ -116,9 +116,19 @@ const executeInPage = function(functionToRunInPage, leaveInPage, id) { // + any 
 };
 
 /** @Proxy store - Wraps GM_(set/get)value with a prefix to prevent interference with other scripts */
+//Use an in-script cache for what's being stored to GM storage. A side effect is that updates in other tabs
+//  are NOT seen cross-tab once the value is first read from storage. This provides semi-independance across
+//  tabs.
+var storageCache = {};
 const store = new Proxy({}, {
-    get: (t, k) => GM_getValue(`MagicTagReview-${ k }`),
-    set: (t, k, v) => (GM_setValue(`MagicTagReview-${ k }`, v), true)
+    get: (t, k) => (typeof storageCache[k] === 'undefined' ? storageCache[k] = GM_getValue(`MagicTagReview-${ k }`) : storageCache[k]),
+    //Immediately update the cache and GM storage.
+    //Saving the data to GM storage asynchronously doesn't solve the problem.
+    //Storing large amounts of data to GM storage in Chrome/Tampermonkey is expensive. It will freeze the tab and
+    //  all Tampermonkey UI tabs (i.e. ones in the background context) for several seconds (it may affect all Tampermonkey
+    //  operations (at least in the background context, which will probably affect loading scripts in new pages).
+    //  This is not the case in Firefox/Tampermonkey or Firefox/Greasemonkey.
+    set: (t, k, v) => (storageCache[k] = v, GM_setValue(`MagicTagReview-${ k }`, storageCache[k]), true)
 });
 
 /** End Reusable Utilities **/
@@ -768,35 +778,37 @@ document.addEventListener('DOMContentLoaded', async _ => {
         const delay = _ => new Promise(resolve => setTimeout(resolve));
         
         const filterQuestions = async question_list => {
+            var performStart = performance.now();
             reset(0,0,1);
             nodes.spinner.show();
             nodes.applyFilters.disabled = true;
             nodes.stopFilter.disabled = false;
-        
-            store.minclose          = nodes.minclosevotes    .value ? +nodes.minclosevotes   .value : '';
-            store.maxclose          = nodes.maxclosevotes    .value ? +nodes.maxclosevotes   .value : '';
-            store.minreopen         = nodes.minreopenvotes   .value ? +nodes.minreopenvotes  .value : '';
-            store.maxreopen         = nodes.maxreopenvotes   .value ? +nodes.maxreopenvotes  .value : '';
-            store.mindelete         = nodes.mindeletevotes   .value ? +nodes.mindeletevotes  .value : '';
-            store.maxdelete         = nodes.maxdeletevotes   .value ? +nodes.maxdeletevotes  .value : '';
-            store.minanswers        = nodes.minanswers       .value ? +nodes.minanswers      .value : '';
-            store.maxanswers        = nodes.maxanswers       .value ? +nodes.maxanswers      .value : '';
-            store.minscore          = nodes.minscore         .value ? +nodes.minscore        .value : '';
-            store.maxscore          = nodes.maxscore         .value ? +nodes.maxscore        .value : '';
-            store.minviews          = nodes.minviews         .value ? +nodes.minviews        .value : '';
-            store.maxviews          = nodes.maxviews         .value ? +nodes.maxviews        .value : '';
-            store.closedatestart    = nodes.closedatestart   .value ? nodes.closedatestart   .value : '';
-            store.closedateend      = nodes.closedateend     .value ? nodes.closedateend     .value : '';
-            store.askeddatestart    = nodes.askeddatestart   .value ? nodes.askeddatestart   .value : '';
-            store.askeddateend      = nodes.askeddateend     .value ? nodes.askeddateend     .value : '';
-            store.activitydatestart = nodes.activitydatestart.value ? nodes.activitydatestart.value : '';
-            store.activitydateend   = nodes.activitydateend  .value ? nodes.activitydateend  .value : '';
-            store.editdatestart     = nodes.editdatestart    .value ? nodes.editdatestart    .value : '';
-            store.editdateend       = nodes.editdateend      .value ? nodes.editdateend      .value : '';
-            store.includestags      = nodes.includestags     .value ? nodes.includestags     .value : '';
-            store.excludestags      = nodes.excludestags     .value ? nodes.excludestags     .value : '';
             
+            const voteFilters = ['close', 'reopen', 'delete'];
+            const nonVoteNumberFilters = ['answers', 'score', 'views'];
+            const numberFilters = voteFilters .concat(nonVoteNumberFilters);
+            const dateFilters = ['closedate', 'askeddate', 'activitydate', 'editdate'];
+            const tagFilters = ['includestags', 'excludestags'];
+
+            //Update values from UI
+            voteFilters.forEach(filter => {
+                store['min' + filter] = nodes[`min${filter}votes`].value ? +nodes[`min${filter}votes`].value : '';
+                store['max' + filter] = nodes[`max${filter}votes`].value ? +nodes[`max${filter}votes`].value : '';
+            });
+            nonVoteNumberFilters.forEach(filter => {
+                store['min' + filter] = nodes[`min${filter}`].value ? +nodes[`min${filter}`].value : '';
+                store['max' + filter] = nodes[`max${filter}`].value ? +nodes[`max${filter}`].value : '';
+            });
+            dateFilters.forEach(filter => {
+                store[filter + 'start'] = nodes[filter + 'start'].value ? nodes[filter + 'start'].value : '';
+                store[filter + 'end']   = nodes[filter + 'end']  .value ? nodes[filter + 'end']  .value : '';
+            });
+            tagFilters.forEach(filter => {
+                store[filter] = nodes[filter].value ? nodes[filter].value : '';
+                store[filter] = nodes[filter].value ? nodes[filter].value : '';
+            });
             
+            //Convert stored data to values we'll actually use in comparisons.
             const closedatestart    = new Date(store.closedatestart   ).getTime() / 1000;
             const closedateend      = new Date(store.closedateend     ).getTime() / 1000;
             const askeddatestart    = new Date(store.askeddatestart   ).getTime() / 1000;
@@ -808,6 +820,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             const includestags      = store.includestags.split(/,\s+/g); 
             const excludestags      = store.excludestags.split(/,\s+/g); 
             
+            //Full list of available filter functions.
             const filters = {
                 incloserange       : e => (store.minclose          !== '' ? store.minclose          <= e.close_vote_count   : true) &&
                                           (store.maxclose          !== '' ? store.maxclose          >= e.close_vote_count   : true) ,
@@ -815,7 +828,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                                           (store.maxdelete         !== '' ? store.maxdelete         >= e.delete_vote_count  : true) ,
                 inreopenrange      : e => (store.minreopen         !== '' ? store.minreopen         <= e.reopen_vote_count  : true) &&
                                           (store.maxreopen         !== '' ? store.maxreopen         >= e.reopen_vote_count  : true) ,
-                inanswerrange      : e => (store.minanswers        !== '' ? store.minanswers        <= e.answer_count       : true) &&
+                inanswersrange     : e => (store.minanswers        !== '' ? store.minanswers        <= e.answer_count       : true) &&
                                           (store.maxanswers        !== '' ? store.maxanswers        >= e.answer_count       : true) ,
                 inscorerange       : e => (store.minscore          !== '' ? store.minscore          <= e.score              : true) &&
                                           (store.maxscore          !== '' ? store.maxscore          >= e.score              : true) ,
@@ -832,45 +845,84 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 includestags       : e =>  store.includestags      !== '' ? includestags.every(t =>  e.tags.includes(t))    : true  ,
                 excludestags       : e =>  store.excludestags      !== '' ? excludestags.every(t => !e.tags.includes(t))    : true  
             };
-            
-            const filter = e => Object.entries(filters).reduce((m, [k, v]) => Object.assign(m, {[k]: v(e)}), {});
+
+            //Remove inactive filters, as there's no need to consider them.
+            numberFilters.forEach(filter => {
+                if(store['min' + filter] === '' && store['max' + filter] === '') {
+                    delete filters['in' + filter + 'range'];
+                }
+            });
+            dateFilters.forEach(filter => {
+                if(store[filter + 'start'] === '' && store[filter + 'end'] === '') {
+                    delete filters['in' + filter + 'range'];
+                }
+            });
+            tagFilters.forEach(filter => {
+                if(store[filter] === '') {
+                    delete filters[filter];
+                }
+            });
+
+            //Prepare lists so we only look at the filters which are active.
+            const activeSecondaryFilters = ['inanswersrange','inscorerange','inviewsrange','inaskeddaterange','inactivitydaterange','ineditdaterange','includestags','excludestags'].filter(key => key in filters);
+            const activeDeleteFilters = ['indeleterange','inreopenrange','inclosedaterange'].filter(key => key in filters);
+            const activeReopenFilters = ['inreopenrange','inclosedaterange'].filter(key => key in filters);
+
+            //Only convert the filters Object into an Array once.
+            const filterList = Object.entries(filters);
+            //Function to get the results for every active filter on a question.
+            const filterQuestion = question => filterList.reduce((allResults, [filterKey, filter]) => Object.assign(allResults, {[filterKey]: filter(question)}), {});
             
             const queue = await new Promise(async resolve => {
-                const queue = [];
-                
+                const filteredQueue = [];
+
                 const isset = {
-                    close : store.minclose  !== '' || store.maxclose  !== '',
-                    delete: store.mindelete !== '' || store.maxdelete !== '',
-                    reopen: store.minreopen !== '' || store.maxreopen !== ''
+                    close : 'incloserange' in filters,
+                    delete: 'indeleterange' in filters,
+                    reopen: 'inreopenrange' in filters
                 }
-            
-                for(const [i, e] of Object.entries(question_list)) {
-                    await delay();
+                
+                await delay();
+                const progressIndicator = nodes.indicator_progress;
+                const progressTextPre = 'Filtering question ';
+                const progressTextPost = ' of ' + question_list.length;
+                progressIndicator.textContent = progressTextPre + '1' + progressTextPost;
+                var currentTime, lastUIUpdate = Date.now();
+                
+                for(const [index, question] of Object.entries(question_list)) {
+                    currentTime = Date.now();
+                    if(currentTime - lastUIUpdate >= 100) {
+                        //Every 100ms: Update displayed progress and release the processor for any other tasks (e.g. let the user click Stop).
+                        lastUIUpdate = currentTime;
+                        await delay();
+                        progressIndicator.textContent = progressTextPre + (+index + 1) + progressTextPost;
+                    }
                     
+                    //If the user has clicked stop, then do so.
                     if(stop) {
                         stop = !stop;
                         break;
                     }
                     
-                    nodes.indicator_progress.textContent = `Filtering question ${+i + 1} of ${question_list.length}`;
-
-                    const r = filter(e);
+                    //Get results for all active filters for the question.
+                    const resultsAllFilters = filterQuestion(question);
                     
-                    const secondary_filters = ['inanswerrange','inscorerange','inviewsrange','inaskeddaterange','inactivitydaterange','ineditdaterange','includestags','excludestags'].every(e => r[e]);
+                    //To qualify, the question must match all secondry filters.
+                    if(!activeSecondaryFilters.every(filterKey => resultsAllFilters[filterKey])) continue;
                     
-                    if(!secondary_filters) continue;
-                    
-                    const primary_filters = {
-                        close  :  isset.close  && r.incloserange,
-                        delete :  isset.delete && ['indeleterange','inreopenrange','inclosedaterange'].every(e => r[e]),
-                        reopen :  isset.reopen && ['inreopenrange','inclosedaterange'].every(r => r[e]),
-                        default: !isset.delete && !isset.close && !isset.reopen && r.inclosedaterange
+                    //A set of filter groups which are OR'ed together. A question needs to only pass one group to qualify.
+                    const primaryFilters = {
+                        close  :  isset.close  && resultsAllFilters.incloserange,
+                        delete :  isset.delete && activeDeleteFilters.every(filterKey => resultsAllFilters[filterKey]),
+                        reopen :  isset.reopen && activeReopenFilters.every(filterKey => resultsAllFilters[filterKey]),
+                        default: !isset.delete && !isset.close && !isset.reopen && resultsAllFilters.inclosedaterange
                     };
                     
-                    if(Object.values(primary_filters).some(e => e)) queue.push(Object.assign(e, {primary_filters}));
+                    //Add the question to the queue, if it matches at least one primary filter. Add the primary filter results to any accepted question.
+                    if(Object.values(primaryFilters).some(primeFilter => primeFilter)) filteredQueue.push(Object.assign(question, {primaryFilters}));
                 }
                 
-                resolve(queue);
+                resolve(filteredQueue);
             });
             
             nodes.spinner.hide();
@@ -880,6 +932,10 @@ document.addEventListener('DOMContentLoaded', async _ => {
             stop = false;
             
             console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
+
+            var performElapsedSeconds = (performance.now() - performStart)/1000;
+            var questionsPerSecond = question_list.length/performElapsedSeconds;
+            console.log('Filtered', question_list.length.toLocaleString(), 'questions in', performElapsedSeconds.toLocaleString(), 'seconds at a rate of', questionsPerSecond.toLocaleString(), 'questions/s.');
             
             return queue;
         };
