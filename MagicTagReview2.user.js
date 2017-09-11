@@ -519,15 +519,15 @@ document.addEventListener('DOMContentLoaded', async _ => {
 
         /** Start Functions **/
 
-        const reset = (q, f, c) => {
-            if(q) {
+        const reset = (queue, filters, current, keepProgresText) => {
+            if(queue) {
                 queue         = [];
                 question_list = [];
                 store.queue         = '[]';
                 store.question_list = '[]';
                 nodes.indicator_quota.textContent = '';
             }
-            if(f) {
+            if(filters) {
                 nodes.tagged           .value = '';
                 nodes.sort             .value = '';
                 nodes.order            .value = '';
@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 nodes.includestags     .value = '';
                 nodes.excludestags     .value = '';
             }
-            if(c) {
+            if(current) {
                 store.current = 0;
             }
 
@@ -568,7 +568,9 @@ document.addEventListener('DOMContentLoaded', async _ => {
             nodes.stop.disabled         = true;
             nodes.prev.disabled         = true;
             nodes.next.disabled         = true;
-            nodes.indicator_progress.textContent  = '';
+            if(!keepProgresText) {
+                nodes.indicator_progress.textContent  = '';
+            }
         };
 
         const retrieve = _ => new Promise(async (resolve, reject) => {
@@ -691,6 +693,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     StackExchange.using("snippets", function () {
                         StackExchange.snippets.initSnippetRenderer();
                         StackExchange.snippets.redraw();
+                        document.querySelector('.review-spinner').style.display = 'none';
+                        document.querySelector('.review-indicator .progress').textContent = '';
                         //Remove the <script> this was loaded in.
                         document.getElementById(questionInitId).remove();
                     });
@@ -699,7 +703,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
         };
 
         const display = current => new Promise(async (resolve, reject) => {
-            reset();
+            reset(0,0,0,1);
 
             const post = queue[current];
 
@@ -882,10 +886,14 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 resolve(queue);
             });
             
-            nodes.spinner.hide();
+            //Don't hide the spinner here due to Chrome/Tampermonkey's issue with GM Storage being expensive.
+            //nodes.spinner.hide();
             nodes.applyFilters.disabled = false;
             nodes.stopFilter.disabled = true;
             nodes.indicator_progress.textContent = '';
+            if(GM_info.script.author) {
+                nodes.indicator_progress.textContent = 'Waiting for data to store (Tampermonkey issue)';
+            }
             stop = false;
             
             console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
