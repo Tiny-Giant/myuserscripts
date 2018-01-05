@@ -260,45 +260,138 @@ gmValuesList.forEach(key => {
     }
 });
 
-/*Get values from in-page window properties (e.g. window.StackExchange...)
+/*Get values from in-page properties/functions (e.g. window.StackExchange...)
  * To get the value you do something like:
+ *   A global value:
+ *       (getPageValue('value', 'StackExchange.options.serverTimeOffsetSec'), returnedPageValue)
+ *   A value from a property on an element:
+ *       (getPageValue(someElement, 'value', 'expandoProperty'), returnedPageValue)
+ *   The return value from calling a synchronous function:
+ *       (getPageValue('someGlobalFunction', argumentArray), returnedPageValue)
  *   (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue)
  * Doing so sends a CustomEvent to the page context asking for the value. The value
  *  is returned in JSON format in another CustomEvent, parsed and stored in
- *  returnedPageValue. This is synchronous, so it's immediately available.
+ *  returnedPageValue. If the in-page call isn't an async function, then this
+ *  is synchronous, so it's immediately available.
  */
 const inPageReplyWithPageValue = () => {
     window.addEventListener('magicTagReview-getPageValue', e => {
+        // e.detail = {
+        //    type: String: The type of data to get: 'value' the value, 'syncFunction' (the return value), 'asyncFunction' (a single value passed to a callback appended to any provided arguments);
+        //    argArray: array of arguments for the sync or async function
+        //    pagePropText: text representation of the in-page value (e.g. StackExchange.options.serverTimeOffsetSec).
+        // }
+        var getPageValueCount;
+        function sendBackData(result) {
+            //Send the value back.
+            window.dispatchEvent(new CustomEvent('magicTagReview-pageValueReturn', {
+                bubbles: true,
+                cancelable: true,
+                detail: JSON.stringify({
+                    getPageValueCount: getPageValueCount,
+                    result: result
+                })
+            }, window));
+        }
         e.stopPropagation();
-        //Send the value back.
-        window.dispatchEvent(new CustomEvent('magicTagReview-pageValueReturn', {
-            bubbles: true,
-            cancelable: true,
-            detail: JSON.stringify(e.detail.split('.').reduce((sum, prop) => {
-                var type = typeof sum;
-                if (type === 'object' || type === 'function') {
-                    return sum[prop];
-                } //else
-                return sum;
-            }, window))
-        }));
+        if(e.detail) {
+            var message = JSON.parse(e.detail);
+            getPageValueCount = message.getPageValueCount;
+            var pageInfo = message.pagePropText.split('.').reduce((sum, prop, index, array) => {
+                    var type = typeof sum;
+                    if ((type === 'object' && sum !== null) || type === 'function') {
+                        return sum[prop];
+                    } //else
+                    //We're not done, but this isn't a object/function, so we failed.
+                    return null;
+            }, e.target);
+            if(message.type) {
+                if(message.type === 'syncFunction') {
+                    if(typeof pageInfo === 'function') {
+                        sendBackData(pageInfo.apply(e.target, message.argArray));
+                        return;
+                    } else {
+                        console.log('inPageReplyWithPageValue: specified in-page value was not a function:', message, '::  pageInfo:', pageInfo);
+                    }
+                } else if(message.type === 'asyncFunction') {
+                    if(typeof pageInfo === 'function') {
+                        message.argArray = Array.isArray(message.argArray) ? message.argArray : [];
+                        message.argArray.push(sendBackData);
+                        pageInfo.apply(e.target, argArray);
+                        return;
+                    } else {
+                        console.log('inPageReplyWithPageValue: specified in-page value was not a function:', message, '::  pageInfo:', pageInfo);
+                    }
+                } else if(message.type === 'value') {
+                    sendBackData(pageInfo);
+                    return;
+                } else {
+                    console.log('inPageReplyWithPageValue: message.type not understood:', message, '::  pageInfo:', pageInfo);
+                }
+            } else {
+                console.log('inPageReplyWithPageValue: no message.type:', message);
+            }
+            sendBackData(null);
+        } else {
+            //default with no message
+            sendBackData(pageInfo.apply(e.target, message.args));
+        }
     }, true);
 };
 executeInPage(inPageReplyWithPageValue, true, 'magicTagReview-pageValueReturner');
 
 var returnedPageValue;
-const getPageValue = (valueText) => {
+var getPageValueCallbacks = {};
+var getPageValueCount = 0;
+const getPageValue = function() {
+    // Arguments: [element] [type] pagePropText [arguments]
+    // Arguments: [element] 'asyncFunction' pagePropText [arguments] callback
     //Request a page value;
-    window.dispatchEvent(new CustomEvent('magicTagReview-getPageValue', {
+    var target = window;
+    var shift = 0;
+    if (arguments[0] instanceof Node) {
+        target = arguments[0];
+        shift++;
+    }
+    var type = (typeof arguments[1 + shift] === 'string') ? arguments[shift++] : 'value';
+    var pagePropText = arguments[shift];
+    var argArray = arguments[shift + 1];
+    var callback = arguments[shift + 2];
+    var testPropTextForFunction = pagePropText.replace(/\(\)$/,'');
+    if(pagePropText !== testPropTextForFunction) {
+        pagePropText = testPropTextForFunction;
+        type = type === 'value' ? 'syncFunction' : type;
+    }
+    if (type === 'asyncFunction') {
+        if(argArray === 'function') {
+            callback = argArray;
+            argArray = null;
+        }
+    }
+    getPageValueCount++;
+    getPageValueCallbacks[getPageValueCount] = callback;
+    target.dispatchEvent(new CustomEvent('magicTagReview-getPageValue', {
         bubbles: true,
         cancelable: true,
-        detail: valueText
+        detail: JSON.stringify({
+            type: type,
+            getPageValueCount: getPageValueCount,
+            pagePropText: pagePropText,
+            argArray: argArray
+        })
     }));
 };
 window.addEventListener('magicTagReview-pageValueReturn', e => {
     e.stopPropagation();
     //Receive the value from the page and assign it to the global variable.
-    returnedPageValue = JSON.parse(e.detail);
+    var message = JSON.parse(e.detail);
+    returnedPageValue = message.result;
+    if(typeof message.getPageValueCount) {
+        var callback = getPageValueCallbacks[message.getPageValueCount];
+        if(typeof callback === 'function') {
+            callback(returnedPageValue);
+        }
+    }
 });
 
 
