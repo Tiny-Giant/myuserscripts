@@ -47,7 +47,18 @@ const executeInPage = function(functionToRunInPage, leaveInPage, id) {
                 });
                 asText += ']';
             } else if (obj === null) {
-                asText +='null';
+                asText += 'null';
+            //undefined
+            } else if (obj === void(0)) {
+                asText += 'void(0)';
+            //Special cases for Number
+            } else if (Number.isNaN(obj)) {
+                asText += 'Number.NaN';
+            } else if (obj === 1/0) {
+                asText += '1/0';
+            } else if (obj === 1/-0) {
+                asText += '1/-0';
+            //function
             } else if (obj instanceof RegExp || typeof obj === 'function') {
                 asText +=  obj.toString();
             } else if (obj instanceof Date) {
@@ -83,7 +94,7 @@ const executeInPage = function(functionToRunInPage, leaveInPage, id) {
     (document.head || document.documentElement).appendChild(newScript);
     if(!leaveInPage) {
         //Synchronous scripts are executed immediately and can be immediately removed.
-        //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+        //Scripts with asynchronous functionality *may* need to remain in the page until complete.
         document.head.removeChild(newScript);
     }
     return newScript;
