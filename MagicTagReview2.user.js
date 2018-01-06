@@ -859,7 +859,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
 
             let page = 1, totalpages = 1, url;
         
-            while(page <= totalpages && result.quota_remaining !== 0 && !result.backoff && stop === false) {
+            while(page <= totalpages && result.quota_remaining !== 0 && stop === false) {
                 nodes.indicator_progress.textContent = `Retrieving question list (page ${page} of ${(totalpages||1)})`;
                 nodes.indicator_quota   .textContent = `API Quota remaining: ${result.quota_remaining}`;
                 url = `${location.protocol}//api.stackexchange.com/2.2/questions?${[
@@ -885,7 +885,10 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 
                 question_list.push(...result.items);
                 
-                if(result.backoff) console.log('Backoff: ' + result.backoff);
+                if(result.backoff) {
+                    console.log('Backoff: ' + result.backoff);
+                    await delay(result.backoff * 1000);
+                }
             }
             store.question_list = JSON.stringify(question_list);
             
@@ -1044,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             nodes.position.value = queue.length ? `${current + 1}/${queue.length}` : '0/0';
         });
         
-        const delay = _ => new Promise(resolve => setTimeout(resolve));
+        const delay = milliseconds => new Promise(resolve => setTimeout(resolve, (milliseconds ? milliseconds : 0)));
         
         const filterQuestions = async question_list => {
             var performStart = performance.now();
