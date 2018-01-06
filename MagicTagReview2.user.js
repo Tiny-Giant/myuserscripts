@@ -5,7 +5,7 @@
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
-// @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
+// @include      /^https?:\/\/(?:\w*\.)?stackoverflow\.com\/review(?:/?|\/MagicTagReview)(?:\?.*)?$/
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_listValues
