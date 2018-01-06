@@ -1206,13 +1206,17 @@ document.addEventListener('DOMContentLoaded', async _ => {
             });
             
             //Don't hide the spinner here due to Chrome/Tampermonkey's issue with GM Storage being expensive.
-            //nodes.spinner.hide();
+            //Unless the queue is empty
+            if (newQueue.length === 0) {
+                nodes.spinner.hide();
+            } else {
+                if(GM_info.script.author) {
+                    nodes.indicator_progress.textContent = 'Waiting for data to store (Tampermonkey issue)';
+                }
+            }
             nodes.applyFilters.disabled = false;
             nodes.stopFilter.disabled = true;
             nodes.indicator_progress.textContent = '';
-            if(GM_info.script.author) {
-                nodes.indicator_progress.textContent = 'Waiting for data to store (Tampermonkey issue)';
-            }
             stop = false;
             
             console.log(newQueue.map(index => ' - https://stackoverflow.com/q/' + question_list[index].question_id).join('\n'));
