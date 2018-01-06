@@ -785,8 +785,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
 
         /** Start Functions **/
 
-        const reset = (queue, filters, current, keepProgresText) => {
-            if(queue) {
+        const reset = (theQueue, filters, current, keepProgresText) => {
+            if(theQueue) {
                 queue         = [];
                 question_list = [];
                 store.queue         = '[]';
@@ -974,7 +974,15 @@ document.addEventListener('DOMContentLoaded', async _ => {
         const display = current => new Promise(async (resolve, reject) => {
             reset(0,0,0,1);
 
-            const post = queue[current];
+            current = +current;
+            //Don't overrun the bounds of the queue.
+            if(!current || current < 0) {
+                current = 0;
+            }
+            if(current > queue.length - 1) {
+                current = queue.length - 1;
+            }
+            const post = question_list[queue[current]];
 
             if (post) {
                 nodes.title.href      = 'http://stackoverflow.com/q/' + post.question_id;
@@ -1043,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             }
             
             nodes.prev.disabled = !queue.length || current < 1;
-            nodes.next.disabled = !queue.length || current === queue.length - 1;
+            nodes.next.disabled = !queue.length || current >= queue.length - 1;
             nodes.position.value = queue.length ? `${current + 1}/${queue.length}` : '0/0';
         });
         
@@ -1145,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             //Function to get the results for every active filter on a question.
             const filterQuestion = question => filterList.reduce((allResults, [filterKey, filter]) => Object.assign(allResults, {[filterKey]: filter(question)}), {});
             
-            const queue = await new Promise(async resolve => {
+            const newQueue = await new Promise(async resolve => {
                 const filteredQueue = [];
 
                 const isset = {
@@ -1191,7 +1199,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     };
                     
                     //Add the question to the queue, if it matches at least one primary filter. Add the primary filter results to any accepted question.
-                    if(Object.values(primaryFilters).some(primeFilter => primeFilter)) filteredQueue.push(Object.assign(question, {primaryFilters}));
+                    if(Object.values(primaryFilters).some(primeFilter => primeFilter)) filteredQueue.push(index);
                 }
                 
                 resolve(filteredQueue);
@@ -1207,13 +1215,13 @@ document.addEventListener('DOMContentLoaded', async _ => {
             }
             stop = false;
             
-            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
+            console.log(newQueue.map(index => ' - https://stackoverflow.com/q/' + question_list[index].question_id).join('\n'));
 
             var performElapsedSeconds = (performance.now() - performStart)/1000;
             var questionsPerSecond = question_list.length/performElapsedSeconds;
             console.log('Filtered', question_list.length.toLocaleString(), 'questions in', performElapsedSeconds.toLocaleString(), 'seconds at a rate of', questionsPerSecond.toLocaleString(), 'questions/s.');
             
-            return queue;
+            return newQueue;
         };
 
         /** End Functions **/
