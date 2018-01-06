@@ -497,11 +497,14 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     font-size:  11px;
                     text-align:  center;
                     padding:  0px;
-                    margin: -5px;
-                    margin-top:  5px;
+                    margin: 5px;
+                    margin-top:  0px;
                     border-top: 1px solid #c8ccd0;
                     line-height: 15px;
                     color: rgb(122, 122, 122);
+                }
+                .review-filters[style=""] ~ .review-filters-toggle {
+                    margin-top:  -24px;
                 }
                 .review-filters td {
                     font-size: 11px;
@@ -533,6 +536,26 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
                 .review-top-right {
                     float: right;
+                }
+                .review-skip-options {
+                    font-size: 11px;
+                    margin-left:10px;
+                }
+                .review-skip-options label {
+                    display: block;
+                    margin-right:10px;
+                    line-height:17px;
+                }
+                .review-skip-options label.review-label-inline {
+                    display: inline-block;
+                    margin-right:5px;
+                }
+                .review-skip-options label.review-label-inline:last-of-type {
+                    margin-right:10px;
+                }
+                .review-skip-options label input {
+                    height: 15px;
+                    margin-right:0px;
                 }
                 .review-info {
                     overflow: hidden;
@@ -569,7 +592,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
                 .review-position {
                     text-align: center;
-                    width: 50px;
+                    min-width: 50px;
+                    max-width: 100px;
                 }
                 .review-didCloseVote {
                     color: red;
@@ -606,6 +630,27 @@ document.addEventListener('DOMContentLoaded', async _ => {
                                 <input class="review-prev" type="button" value="Previous">
                                 <input class="review-position" type="text" readonly value="0/0">
                                 <input class="review-next" type="button" value="Next">
+                            </div>
+                            <div class="review-top-right review-skip-options">
+                                <div>
+                                    Skip:
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-voted" type="checkbox"/>
+                                        voted
+                                    </label>
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-closed" type="checkbox"/>
+                                        closed
+                                    </label>
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-deleted" type="checkbox"/>
+                                        deleted
+                                    </label>
+                                </div>
+                                <label>
+                                    <input class="review-auto-next" type="checkbox"/>
+                                    Auto-next/previous after vote
+                                </label>
                             </div>
                         </div>
                         <div class="review-filters" style="display: none">
@@ -752,6 +797,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
         executeInPage(inPageInitInlineEditing, true, inlineEditingInitId, inlineEditingInitId);
 
         let stop          = false,
+            direction     = 1,
             queue         = JSON.parse(store.queue              || '[]'),
             question_list = JSON.parse(store.question_list      || '[]');
 
@@ -780,6 +826,10 @@ document.addEventListener('DOMContentLoaded', async _ => {
         nodes.editdateend      .value = store.editdateend       || '';
         nodes.includestags     .value = store.includestags      || '';
         nodes.excludestags     .value = store.excludestags      || '';
+        nodes.skipVoted      .checked = !!store.skipVoted;
+        nodes.skipClosed     .checked = !!store.skipClosed;
+        nodes.skipDeleted    .checked = !!store.skipDeleted;
+        nodes.autoNext       .checked = !!store.autoNext;
 
         /** End Initialization **/
 
@@ -940,32 +990,99 @@ document.addEventListener('DOMContentLoaded', async _ => {
         const inPageInitQuestionWithComments = (initInfo, questionInitId) => {
             //Direct SE to load what we need (SE.using), but wait to execute until we know it's available (SE.ready).
             //StackExchange.question.init is in "full.js", which is loaded for any of: "loggedIn", "inlineEditing", "beginEditEvent", "translation".
-            StackExchange.using('inlineEditing', function () {
-                StackExchange.ready(function () {
-                    StackExchange.question.init(initInfo);
-                    var title = document.querySelector('.review-title');
-                    var didCloseVote = title.parentNode.querySelector('.review-didCloseVoteFull');
-                    if (document.querySelector('a[title^="You voted to close"]')) {
-                        if(didCloseVote) {
-                            didCloseVote.style.display = '';
-                        } else {
-                            if(title) {
-                                title.insertAdjacentHTML('afterend','<span class="review-didCloseVoteFull"> - <span class="review-didCloseVote">Voted</span></span>');
-                            }
-                        }
+            function isQuestionClosed() {
+                return $('.special-status .question-status H2 B').filter(function() {
+                    return /hold|closed|marked/i.test($(this).text());
+                }).length > 0;
+            }
+            function isQuestionDeleted() {
+                return $('.question').first().is('.deleted-answer');
+            }
+            function showHasVoted(show) {
+                var title = document.querySelector('.review-title');
+                var didCloseVoteEl = title.parentNode.querySelector('.review-didCloseVoteFull');
+                if (show) {
+                    if(didCloseVoteEl) {
+                        didCloseVoteEl.style.display = '';
                     } else {
-                        if(didCloseVote) {
-                            didCloseVote.style.display = 'none';
+                        if(title) {
+                            title.insertAdjacentHTML('afterend','<span class="review-didCloseVoteFull"> - <span class="review-didCloseVote">Voted</span></span>');
                         }
                     }
+                } else {
+                    if(didCloseVoteEl) {
+                        didCloseVoteEl.style.display = 'none';
+                    }
+                }
+            }
+            StackExchange.using('inlineEditing', function () {
+                StackExchange.ready(function () {
+                    var hasVotedToClose = false;
+                    var hasVotedToDelete = false;
+                    var fetchDeleteTooltip = jQuery.Deferred(deferred => deferred.resolve());
+                    StackExchange.question.init(initInfo);
+                    if (document.querySelector('a[title^="You voted to close"]')) {
+                        hasVotedToClose = true;
+                    }
+                    const deleteButton = document.querySelector('a[title$="to delete this post"]');
+                    if (deleteButton) {
+                        //The queston can be and may have been voted to delete by this user.
+                        const deleteIdMatches = /\d+/.exec(deleteButton.id);
+                        const deleteId = deleteIdMatches ? deleteIdMatches[0] : null;
+                        if (deleteId) {
+                            //This GET may need to be delayed in order to slow down requests (if we end up being rate-limited).
+                            fetchDeleteTooltip = $.get(`/posts/${deleteId}/delete-tooltip`).done(newToolTipText => {
+                                if (/^You voted to delete/.test(newToolTipText)) {
+                                    hasVotedToDelete = true;
+                                }
+                                //Update the tooltip, to prevent fetching this information twice.
+                                deleteButton.classList.remove('load-tooltip-on-hover');
+                                deleteButton.title = newToolTipText;
+                                showHasVoted(hasVotedToDelete);
+                            });
+                        }
+                    }
+                    showHasVoted(hasVotedToClose);
                     StackExchange.comments.loadAll($('.question'));
+                    //Initialize snippets
                     StackExchange.using("snippets", function () {
                         StackExchange.snippets.initSnippetRenderer();
                         StackExchange.snippets.redraw();
                         document.querySelector('.review-spinner').style.display = 'none';
                         document.querySelector('.review-indicator .progress').textContent = '';
-                        //Remove the <script> this was loaded in.
-                        document.getElementById(questionInitId).remove();
+                        //Make sure everything's done (i.e. we have the delete tooltip)
+                        fetchDeleteTooltip.done(() => {
+                            if(hasVotedToClose) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-userHasVotedToClose', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(hasVotedToDelete) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-userHasVotedToDelete', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(isQuestionClosed()) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-questionIsClosed', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(isQuestionDeleted()) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-questionIsDeleted', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            window.dispatchEvent(new CustomEvent('magicTagReview-questionFullyDisplayed', {
+                                bubbles: true,
+                                cancelable: true
+                            }));
+                            //Remove the <script> this was loaded in.
+                            document.getElementById(questionInitId).remove();
+                        });
                     });
                 });
             });
@@ -985,10 +1102,29 @@ document.addEventListener('DOMContentLoaded', async _ => {
             const post = question_list[queue[current]];
 
             if (post) {
+                //See if we should skip diplaying this question.
+                // Note: There currently isn't any way for questions to be marked undeleted or reopened.
+                if( ((post.userVotedToClose || post.userVotedToDelete) && advanceToNextQuestionIfSkipVoted(true)) ||
+                    ((post.questionIsClosed || post.closed_date) && advanceToNextQuestionIfSkipClosed(true)) ||
+                    (post.questionIsDeleted && advanceToNextQuestionIfSkipDeleted(true))
+                ) {
+                    //We did not display the question, but this is not a rejection (because we use await and don't want to throw).
+                    resolve(false);
+                    return;
+                }
+
                 nodes.title.href      = 'http://stackoverflow.com/q/' + post.question_id;
                 nodes.title.innerHTML = post.title;
 
                 nodes.question.innerHTML = await fetchQuestion(post);
+
+                //Listen for when the question is completely displayed.
+                const isDisplayedListener = e => {
+                    window.removeEventListener('magicTagReview-questionFullyDisplayed', isDisplayedListener, true);
+                    //Resolve the Promise with true to indicate that it was sucessful.
+                    resolve(true);
+                };
+                window.addEventListener('magicTagReview-questionFullyDisplayed', isDisplayedListener, true);
 
                 //Initialize the question, with comments
                 //Get a unique ID for this execution of inPageInitQuestionWithComments.
@@ -1002,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 const prettyDate = time => {
                     if (time === null || time.length != 20) return;
 
-                    // firefox requires ISO 8601 formated dates
+                    //Firefox requires ISO 8601 formated dates
                     time = time.substr(0, 10) + "T" + time.substr(11, 10);
                     var date = new Date(time),
                         diff = (((new Date()).getTime() - date.getTime()) / 1000) + (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue),
@@ -1247,17 +1383,33 @@ document.addEventListener('DOMContentLoaded', async _ => {
             event.preventDefault();
             queue = await filterQuestions(question_list);
             store.queue = JSON.stringify(queue);
-            display(+store.current);
+            display(store.current);
         }, false);
 
         nodes.prev.addEventListener('click', _ => {
-            store.current = +store.current - 1;
-            display(+store.current);
+            direction = -1;
+            advanceToNextQuestion(true);
         }, false);
 
         nodes.next.addEventListener('click', _ => {
-            store.current = +store.current + 1;
-            display(+store.current);
+            direction = 1;
+            advanceToNextQuestion(true);
+        }, false);
+
+        nodes.autoNext.addEventListener('click', _ => {
+            store.autoNext = nodes.autoNext.checked;
+        }, false);
+
+        nodes.skipVoted.addEventListener('click', _ => {
+            store.skipVoted = nodes.skipVoted.checked;
+        }, false);
+
+        nodes.skipClosed.addEventListener('click', _ => {
+            store.skipClosed = nodes.skipClosed.checked;
+        }, false);
+
+        nodes.skipDeleted.addEventListener('click', _ => {
+            store.skipDeleted = nodes.skipDeleted.checked;
         }, false);
         
         (_ => {
@@ -1302,7 +1454,26 @@ document.addEventListener('DOMContentLoaded', async _ => {
                             "CountNeededForStateChange":1
                         });
                         data.value = JSON.stringify(obj);
-                        window.dispatchEvent(new CustomEvent('magicTagReview-userCloseVoted', {
+                    }
+                    window.dispatchEvent(new CustomEvent('magicTagReview-userCloseVoted', {
+                        detail: data.xhr.responseURL,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                }
+            }
+        });
+
+        // Listen for delete votes
+        executeInPage(listener => addXHRListener(listener), true, 'magicTagReview-addXHRListener-watchDeleteVotes', {
+            regex: /\/posts\/\d+\/vote\/10$/,
+            get: data => {
+                //jQuery gets the responseText and parses it for JSON. This allows us to watch for jQuery doing that.
+                if(data.property === 'responseText') {
+                    const obj = JSON.parse(data.xhr.responseText);
+                    if(obj.Success) {
+                        window.dispatchEvent(new CustomEvent('magicTagReview-userDeleteVoted', {
+                            detail: data.xhr.responseURL,
                             bubbles: true,
                             cancelable: true
                         }));
@@ -1310,8 +1481,94 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
             }
         });
-        window.addEventListener('magicTagReview-userCloseVoted', e => display(store.current), true);
-        
-        display(+store.current);
+
+        const advanceToNextQuestionIfAutoNext = (immediate) => {
+            if(store.autoNext) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipClosed = (immediate) => {
+            if(store.skipClosed) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipDeleted = (immediate) => {
+            if(store.skipDeleted) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipVoted = (immediate) => {
+            if(store.skipVoted) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        var advanceQuestionTimeout = 0;
+        const advanceToNextQuestion = (immediate) => {
+            const current = store.current;
+            var newCurrent = Math.min(Math.max(current + direction, 0), queue.length - 1);
+            if(newCurrent == current) {
+                //Can't actually go to the next question.
+                return false;
+            } //else
+            store.current = newCurrent;
+            clearTimeout(advanceQuestionTimeout);
+            //Prior testing indicated that a delay between showing questions of 0.5s was sufficient to prevent being rate limited.
+            advanceQuestionTimeout = setTimeout(display, (immediate ? 0 : 500), store.current);
+            return true;
+        }
+
+        var previousUserCloseVoteURL = '';
+        window.addEventListener('magicTagReview-userCloseVoted', e => {
+            //Record that the question was close-voted by the user, so we don't have to display the question to find out.
+            //We may get multiple events per vote.
+            if(e.detail !== previousUserCloseVoteURL) {
+                //It's a new URL (new question).
+                previousUserCloseVoteURL = e.detail;
+                advanceToNextQuestionIfAutoNext();
+            }
+        }, true);
+
+        var previousUserDeleteVoteURL = '';
+        window.addEventListener('magicTagReview-userDeleteVoted', e => {
+            //Record that the question was delete-voted by the user, so we don't have to display the question to find out.
+            //We may get multiple events per vote.
+            if(e.detail !== previousUserDeleteVoteURL) {
+                //It's a new URL (new question).
+                previousUserDeleteVoteURL = e.detail;
+                advanceToNextQuestionIfAutoNext();
+            }
+        }, true);
+
+        //Get reports of question state once the question has been displayed (from the page context).
+        window.addEventListener('magicTagReview-userHasVotedToClose', e => {
+            //Record that the user previously close-voted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].userVotedToClose = true;
+            advanceToNextQuestionIfSkipVoted();
+        }, true);
+        window.addEventListener('magicTagReview-userHasVotedToDelete', e => {
+            //Record that the user previously delete-voted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].userVotedToDelete = true;
+            advanceToNextQuestionIfSkipVoted();
+        }, true);
+        window.addEventListener('magicTagReview-questionIsClosed', e => {
+            //Record that the question is closed, so we don't have to display the question to find out.
+            question_list[queue[store.current]].questionIsClosed = true;
+            advanceToNextQuestionIfSkipClosed();
+        }, true);
+        window.addEventListener('magicTagReview-questionIsDeleted', e => {
+            //Record that the question is deleted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].questionIsDeleted = true;
+            advanceToNextQuestionIfSkipDeleted();
+        }, true);
+
+        display(store.current);
     }
 }, false);
