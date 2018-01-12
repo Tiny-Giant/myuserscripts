@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         Magic™ Tag Review 2
 // @namespace    http://github.com/Tiny-Giant
-// @version      1.0.1.2
+// @version      1.0.2.0
 // @description  Custom review queue for tag oriented reviewing with the ability to filter by close votes and delete votes
 // @author       @TinyGiant
 // @contributor  @Makyen
-// @include      /^https?:\/\/\w*.?stackoverflow\.com\/review*/
+// @include      /^https?:\/\/(?:\w*\.)?stackoverflow\.com\/review(?:/?|\/MagicTagReview)(?:\?.*)?$/
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_listValues
+// @grant        GM_deleteValue
 // @grant        GM_addValueChangeListener
 // @run-at       document-start
 // ==/UserScript==
@@ -47,7 +49,18 @@ const executeInPage = function(functionToRunInPage, leaveInPage, id) {
                 });
                 asText += ']';
             } else if (obj === null) {
-                asText +='null';
+                asText += 'null';
+            //undefined
+            } else if (obj === void(0)) {
+                asText += 'void(0)';
+            //Special cases for Number
+            } else if (Number.isNaN(obj)) {
+                asText += 'Number.NaN';
+            } else if (obj === 1/0) {
+                asText += '1/0';
+            } else if (obj === 1/-0) {
+                asText += '1/-0';
+            //function
             } else if (obj instanceof RegExp || typeof obj === 'function') {
                 asText +=  obj.toString();
             } else if (obj instanceof Date) {
@@ -83,7 +96,7 @@ const executeInPage = function(functionToRunInPage, leaveInPage, id) {
     (document.head || document.documentElement).appendChild(newScript);
     if(!leaveInPage) {
         //Synchronous scripts are executed immediately and can be immediately removed.
-        //Scripts with asynchronous functionality of any type must remain in the page until all complete.
+        //Scripts with asynchronous functionality *may* need to remain in the page until complete.
         document.head.removeChild(newScript);
     }
     return newScript;
@@ -161,61 +174,224 @@ const inPageAddXHRListener = listen => {
 });*/
 executeInPage(inPageAddXHRListener, true, 'magicTagReview-addXHRListener');
 
-/** @Proxy store - Wraps GM_(set/get)value with a prefix to prevent interference with other scripts */
+//LZ-String 1.4.4
+// Copyright (c) 2013 Pieroxy <pieroxy@pieroxy.net>
+// This work is free. You can redistribute it and/or modify it
+// under the terms of the WTFPL, Version 2
+// For more information see LICENSE.txt or http://www.wtfpl.net/
+//
+// For more information, the home page:
+// http://pieroxy.net/blog/pages/lz-string/testing.html
+//
+// LZ-based compression algorithm, version 1.4.4
+// From: https://github.com/pieroxy/lz-string/blob/master/libs/lz-string.min.js
+var LZString=function(){function o(o,r){if(!t[o]){t[o]={};for(var n=0;n<o.length;n++)t[o][o.charAt(n)]=n}return t[o][r]}var r=String.fromCharCode,n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",e="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",t={},i={compressToBase64:function(o){if(null==o)return"";var r=i._compress(o,6,function(o){return n.charAt(o)});switch(r.length%4){default:case 0:return r;case 1:return r+"===";case 2:return r+"==";case 3:return r+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(e){return o(n,r.charAt(e))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(o){return null==o?"":""==o?null:i._decompress(o.length,16384,function(r){return o.charCodeAt(r)-32})},compressToUint8Array:function(o){for(var r=i.compress(o),n=new Uint8Array(2*r.length),e=0,t=r.length;t>e;e++){var s=r.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null===o||void 0===o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;t>e;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(o){return null==o?"":i._compress(o,6,function(o){return e.charAt(o)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(n){return o(e,r.charAt(n))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(o,r,n){if(null==o)return"";var e,t,i,s={},p={},u="",c="",a="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<o.length;i+=1)if(u=o.charAt(i),Object.prototype.hasOwnProperty.call(s,u)||(s[u]=f++,p[u]=!0),c=a+u,Object.prototype.hasOwnProperty.call(s,c))a=c;else{if(Object.prototype.hasOwnProperty.call(p,a)){if(a.charCodeAt(0)<256){for(e=0;h>e;e++)m<<=1,v==r-1?(v=0,d.push(n(m)),m=0):v++;for(t=a.charCodeAt(0),e=0;8>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;h>e;e++)m=m<<1|t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=a.charCodeAt(0),e=0;16>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}l--,0==l&&(l=Math.pow(2,h),h++),delete p[a]}else for(t=s[a],e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;l--,0==l&&(l=Math.pow(2,h),h++),s[c]=f++,a=String(u)}if(""!==a){if(Object.prototype.hasOwnProperty.call(p,a)){if(a.charCodeAt(0)<256){for(e=0;h>e;e++)m<<=1,v==r-1?(v=0,d.push(n(m)),m=0):v++;for(t=a.charCodeAt(0),e=0;8>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;h>e;e++)m=m<<1|t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=a.charCodeAt(0),e=0;16>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}l--,0==l&&(l=Math.pow(2,h),h++),delete p[a]}else for(t=s[a],e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;l--,0==l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==r-1){d.push(n(m));break}v++}return d.join("")},decompress:function(o){return null==o?"":""==o?null:i._decompress(o.length,32768,function(r){return o.charCodeAt(r)})},_decompress:function(o,n,e){var t,i,s,p,u,c,a,l,f=[],h=4,d=4,m=3,v="",w=[],A={val:e(0),position:n,index:1};for(i=0;3>i;i+=1)f[i]=i;for(p=0,c=Math.pow(2,2),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;switch(t=p){case 0:for(p=0,c=Math.pow(2,8),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;l=r(p);break;case 1:for(p=0,c=Math.pow(2,16),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;l=r(p);break;case 2:return""}for(f[3]=l,s=l,w.push(l);;){if(A.index>o)return"";for(p=0,c=Math.pow(2,m),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;switch(l=p){case 0:for(p=0,c=Math.pow(2,8),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;f[d++]=r(p),l=d-1,h--;break;case 1:for(p=0,c=Math.pow(2,16),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;f[d++]=r(p),l=d-1,h--;break;case 2:return w.join("")}if(0==h&&(h=Math.pow(2,m),m++),f[l])v=f[l];else{if(l!==d)return null;v=s+s.charAt(0)}w.push(v),f[d++]=s+v.charAt(0),h--,s=v,0==h&&(h=Math.pow(2,m),m++)}}};return i}();"function"==typeof define&&define.amd?define(function(){return LZString}):"undefined"!=typeof module&&null!=module&&(module.exports=LZString);
+
+
+/** @Proxy store - Wraps GM_(set/get)value */
 //Use an in-script cache for what's being stored to GM storage. A side effect is that updates in other tabs
 //  are NOT seen cross-tab once the value is first read from storage. This provides semi-independance across
 //  tabs.
 var storageCache = {};
+try {
+    storageCache = JSON.parse(localStorage['MagicTagReview-storeageCache']);
+} catch(e) {
+}
+var storageCacheSeparate = {};
+var storageCacheTimeout=0;
+const storageSeparateList = ['queue', 'question_list', 'current'];
 const store = new Proxy({}, {
-    get: (t, k) => (typeof storageCache[k] === 'undefined' ? storageCache[k] = GM_getValue(`MagicTagReview-${ k }`) : storageCache[k]),
+    get: (target, key) => {
+        if (storageSeparateList.indexOf(key) > -1) {
+            if(key === 'current') {
+                var current = +localStorage['MagicTagReview-' + key];
+                return current ? current : 0;
+            } else {
+                if(typeof storageCacheSeparate[key] === 'undefined') {
+                    const lzString = GM_getValue(`${key}-LZString`);
+                    const uncompressed = LZString.decompressFromBase64(lzString);
+                    storageCacheSeparate[key] = uncompressed;
+                }
+                return storageCacheSeparate[key];
+            }
+        } else {
+            return storageCache[key];
+        }
+    },
     //Immediately update the cache and GM storage.
-    //Saving the data to GM storage asynchronously doesn't solve the problem.
-    //Storing large amounts of data to GM storage in Chrome/Tampermonkey is expensive. It will freeze the tab and
+    //Saving the data to GM storage asynchronously doesn't solve the problem of long times to store data.
+    //Storing large amounts of data or multiple values to GM storage in Chrome/Tampermonkey is expensive. It will freeze the tab and
     //  all Tampermonkey UI tabs (i.e. ones in the background context) for several seconds (it may affect all Tampermonkey
     //  operations (at least in the background context, which will probably affect loading scripts in new pages).
-    //  This is not the case in Firefox/Tampermonkey or Firefox/Greasemonkey.
-    set: (t, k, v) => (storageCache[k] = v, GM_setValue(`MagicTagReview-${ k }`, storageCache[k]), true)
+    //  Thus, only the queue and question_list are stored in GM storage. Everything else is stored in localStorage.
+    set: (target, key, value) => {
+        if (storageSeparateList.indexOf(key) > -1) {
+            if(key === 'current') {
+                localStorage['MagicTagReview-' + key] = value;
+            } else {
+                storageCacheSeparate[key] = value;
+                const compressed = LZString.compressToBase64(value);
+                const uncompressed = LZString.decompressFromBase64(compressed);
+                GM_setValue(`${key}-LZString`, compressed);
+                const lzString = GM_getValue(`${key}-LZString`);
+                const uncompressed2 = LZString.decompressFromBase64(lzString);
+            }
+        } else {
+            storageCache[key] = value;
+            //Don't stall execution for storing the chache (this doesn't actually help Chrome/Tampermonkey).
+            clearTimeout(storageCacheTimeout);
+            storageCacheTimeout = setTimeout(_ => {
+                localStorage['MagicTagReview-storeageCache'] = JSON.stringify(storageCache);
+            }, 0);
+        }
+        return true;
+    }
 });
 
-/*Get values from in-page window properties (e.g. window.StackExchange...)
+//Clean-up from earlier released version of the script/Transfer data from original GM_setValue keys to storageCache.
+//We need to clear localStorage *and* GM_storage
+var gmValuesList = GM_listValues();
+gmValuesList.forEach(key => {
+    if(key.indexOf('MagicTagReview-') === 0) {
+        var mainKey = key.replace(/^MagicTagReview-/,'');
+        var value = GM_getValue(key);
+        store[mainKey] = value;
+        GM_deleteValue(key);
+    }
+});
+
+/*Get values from in-page properties/functions (e.g. window.StackExchange...)
  * To get the value you do something like:
+ *   A global value:
+ *       (getPageValue('value', 'StackExchange.options.serverTimeOffsetSec'), returnedPageValue)
+ *   A value from a property on an element:
+ *       (getPageValue(someElement, 'value', 'expandoProperty'), returnedPageValue)
+ *   The return value from calling a synchronous function:
+ *       (getPageValue('someGlobalFunction', argumentArray), returnedPageValue)
  *   (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue)
  * Doing so sends a CustomEvent to the page context asking for the value. The value
  *  is returned in JSON format in another CustomEvent, parsed and stored in
- *  returnedPageValue. This is synchronous, so it's immediately available.
+ *  returnedPageValue. If the in-page call isn't an async function, then this
+ *  is synchronous, so it's immediately available.
  */
 const inPageReplyWithPageValue = () => {
     window.addEventListener('magicTagReview-getPageValue', e => {
+        // e.detail = {
+        //    type: String: The type of data to get: 'value' the value, 'syncFunction' (the return value), 'asyncFunction' (a single value passed to a callback appended to any provided arguments);
+        //    argArray: array of arguments for the sync or async function
+        //    pagePropText: text representation of the in-page value (e.g. StackExchange.options.serverTimeOffsetSec).
+        // }
+        var getPageValueCount;
+        function sendBackData(result) {
+            //Send the value back.
+            window.dispatchEvent(new CustomEvent('magicTagReview-pageValueReturn', {
+                bubbles: true,
+                cancelable: true,
+                detail: JSON.stringify({
+                    getPageValueCount: getPageValueCount,
+                    result: result
+                })
+            }, window));
+        }
         e.stopPropagation();
-        //Send the value back.
-        window.dispatchEvent(new CustomEvent('magicTagReview-pageValueReturn', {
-            bubbles: true,
-            cancelable: true,
-            detail: JSON.stringify(e.detail.split('.').reduce((sum, prop) => {
-                var type = typeof sum;
-                if (type === 'object' || type === 'function') {
-                    return sum[prop];
-                } //else
-                return sum;
-            }, window))
-        }));
+        if(e.detail) {
+            var message = JSON.parse(e.detail);
+            getPageValueCount = message.getPageValueCount;
+            var pageInfo = message.pagePropText.split('.').reduce((sum, prop, index, array) => {
+                    var type = typeof sum;
+                    if ((type === 'object' && sum !== null) || type === 'function') {
+                        return sum[prop];
+                    } //else
+                    //We're not done, but this isn't a object/function, so we failed.
+                    return null;
+            }, e.target);
+            if(message.type) {
+                if(message.type === 'syncFunction') {
+                    if(typeof pageInfo === 'function') {
+                        sendBackData(pageInfo.apply(e.target, message.argArray));
+                        return;
+                    } else {
+                        console.log('inPageReplyWithPageValue: specified in-page value was not a function:', message, '::  pageInfo:', pageInfo);
+                    }
+                } else if(message.type === 'asyncFunction') {
+                    if(typeof pageInfo === 'function') {
+                        message.argArray = Array.isArray(message.argArray) ? message.argArray : [];
+                        message.argArray.push(sendBackData);
+                        pageInfo.apply(e.target, argArray);
+                        return;
+                    } else {
+                        console.log('inPageReplyWithPageValue: specified in-page value was not a function:', message, '::  pageInfo:', pageInfo);
+                    }
+                } else if(message.type === 'value') {
+                    sendBackData(pageInfo);
+                    return;
+                } else {
+                    console.log('inPageReplyWithPageValue: message.type not understood:', message, '::  pageInfo:', pageInfo);
+                }
+            } else {
+                console.log('inPageReplyWithPageValue: no message.type:', message);
+            }
+            sendBackData(null);
+        } else {
+            //default with no message
+            sendBackData(pageInfo.apply(e.target, message.args));
+        }
     }, true);
 };
 executeInPage(inPageReplyWithPageValue, true, 'magicTagReview-pageValueReturner');
 
 var returnedPageValue;
-const getPageValue = (valueText) => {
+var getPageValueCallbacks = {};
+var getPageValueCount = 0;
+const getPageValue = function() {
+    // Arguments: [element] [type] pagePropText [arguments]
+    // Arguments: [element] 'asyncFunction' pagePropText [arguments] callback
     //Request a page value;
-    window.dispatchEvent(new CustomEvent('magicTagReview-getPageValue', {
+    var target = window;
+    var shift = 0;
+    if (arguments[0] instanceof Node) {
+        target = arguments[0];
+        shift++;
+    }
+    var type = (typeof arguments[1 + shift] === 'string') ? arguments[shift++] : 'value';
+    var pagePropText = arguments[shift];
+    var argArray = arguments[shift + 1];
+    var callback = arguments[shift + 2];
+    var testPropTextForFunction = pagePropText.replace(/\(\)$/,'');
+    if(pagePropText !== testPropTextForFunction) {
+        pagePropText = testPropTextForFunction;
+        type = type === 'value' ? 'syncFunction' : type;
+    }
+    if (type === 'asyncFunction') {
+        if(argArray === 'function') {
+            callback = argArray;
+            argArray = null;
+        }
+    }
+    getPageValueCount++;
+    getPageValueCallbacks[getPageValueCount] = callback;
+    target.dispatchEvent(new CustomEvent('magicTagReview-getPageValue', {
         bubbles: true,
         cancelable: true,
-        detail: valueText
+        detail: JSON.stringify({
+            type: type,
+            getPageValueCount: getPageValueCount,
+            pagePropText: pagePropText,
+            argArray: argArray
+        })
     }));
 };
 window.addEventListener('magicTagReview-pageValueReturn', e => {
     e.stopPropagation();
     //Receive the value from the page and assign it to the global variable.
-    returnedPageValue = JSON.parse(e.detail);
+    var message = JSON.parse(e.detail);
+    returnedPageValue = message.result;
+    if(typeof message.getPageValueCount) {
+        var callback = getPageValueCallbacks[message.getPageValueCount];
+        if(typeof callback === 'function') {
+            callback(returnedPageValue);
+        }
+    }
 });
 
 
@@ -321,11 +497,14 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     font-size:  11px;
                     text-align:  center;
                     padding:  0px;
-                    margin: -5px;
-                    margin-top:  5px;
+                    margin: 5px;
+                    margin-top:  0px;
                     border-top: 1px solid #c8ccd0;
                     line-height: 15px;
                     color: rgb(122, 122, 122);
+                }
+                .review-filters[style=""] ~ .review-filters-toggle {
+                    margin-top:  -24px;
                 }
                 .review-filters td {
                     font-size: 11px;
@@ -357,6 +536,26 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
                 .review-top-right {
                     float: right;
+                }
+                .review-skip-options {
+                    font-size: 11px;
+                    margin-left:10px;
+                }
+                .review-skip-options label {
+                    display: block;
+                    margin-right:10px;
+                    line-height:17px;
+                }
+                .review-skip-options label.review-label-inline {
+                    display: inline-block;
+                    margin-right:5px;
+                }
+                .review-skip-options label.review-label-inline:last-of-type {
+                    margin-right:10px;
+                }
+                .review-skip-options label input {
+                    height: 15px;
+                    margin-right:0px;
                 }
                 .review-info {
                     overflow: hidden;
@@ -393,7 +592,8 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
                 .review-position {
                     text-align: center;
-                    width: 50px;
+                    min-width: 50px;
+                    max-width: 100px;
                 }
                 .review-didCloseVote {
                     color: red;
@@ -430,6 +630,27 @@ document.addEventListener('DOMContentLoaded', async _ => {
                                 <input class="review-prev" type="button" value="Previous">
                                 <input class="review-position" type="text" readonly value="0/0">
                                 <input class="review-next" type="button" value="Next">
+                            </div>
+                            <div class="review-top-right review-skip-options">
+                                <div>
+                                    Skip:
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-voted" type="checkbox"/>
+                                        voted
+                                    </label>
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-closed" type="checkbox"/>
+                                        closed
+                                    </label>
+                                    <label class="review-label-inline">
+                                        <input class="review-skip-deleted" type="checkbox"/>
+                                        deleted
+                                    </label>
+                                </div>
+                                <label>
+                                    <input class="review-auto-next" type="checkbox"/>
+                                    Auto-next/previous after vote
+                                </label>
                             </div>
                         </div>
                         <div class="review-filters" style="display: none">
@@ -576,6 +797,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
         executeInPage(inPageInitInlineEditing, true, inlineEditingInitId, inlineEditingInitId);
 
         let stop          = false,
+            direction     = 1,
             queue         = JSON.parse(store.queue              || '[]'),
             question_list = JSON.parse(store.question_list      || '[]');
 
@@ -604,13 +826,17 @@ document.addEventListener('DOMContentLoaded', async _ => {
         nodes.editdateend      .value = store.editdateend       || '';
         nodes.includestags     .value = store.includestags      || '';
         nodes.excludestags     .value = store.excludestags      || '';
+        nodes.skipVoted      .checked = !!store.skipVoted;
+        nodes.skipClosed     .checked = !!store.skipClosed;
+        nodes.skipDeleted    .checked = !!store.skipDeleted;
+        nodes.autoNext       .checked = !!store.autoNext;
 
         /** End Initialization **/
 
         /** Start Functions **/
 
-        const reset = (queue, filters, current, keepProgresText) => {
-            if(queue) {
+        const reset = (theQueue, filters, current, keepProgresText) => {
+            if(theQueue) {
                 queue         = [];
                 question_list = [];
                 store.queue         = '[]';
@@ -683,7 +909,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
 
             let page = 1, totalpages = 1, url;
         
-            while(page <= totalpages && result.quota_remaining !== 0 && !result.backoff && stop === false) {
+            while(page <= totalpages && result.quota_remaining !== 0 && stop === false) {
                 nodes.indicator_progress.textContent = `Retrieving question list (page ${page} of ${(totalpages||1)})`;
                 nodes.indicator_quota   .textContent = `API Quota remaining: ${result.quota_remaining}`;
                 url = `${location.protocol}//api.stackexchange.com/2.2/questions?${[
@@ -709,7 +935,10 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 
                 question_list.push(...result.items);
                 
-                if(result.backoff) console.log('Backoff: ' + result.backoff);
+                if(result.backoff) {
+                    console.log('Backoff: ' + result.backoff);
+                    await delay(result.backoff * 1000);
+                }
             }
             store.question_list = JSON.stringify(question_list);
             
@@ -761,32 +990,99 @@ document.addEventListener('DOMContentLoaded', async _ => {
         const inPageInitQuestionWithComments = (initInfo, questionInitId) => {
             //Direct SE to load what we need (SE.using), but wait to execute until we know it's available (SE.ready).
             //StackExchange.question.init is in "full.js", which is loaded for any of: "loggedIn", "inlineEditing", "beginEditEvent", "translation".
-            StackExchange.using('inlineEditing', function () {
-                StackExchange.ready(function () {
-                    StackExchange.question.init(initInfo);
-                    var title = document.querySelector('.review-title');
-                    var didCloseVote = title.parentNode.querySelector('.review-didCloseVoteFull');
-                    if (document.querySelector('a[title^="You voted to close"]')) {
-                        if(didCloseVote) {
-                            didCloseVote.style.display = '';
-                        } else {
-                            if(title) {
-                                title.insertAdjacentHTML('afterend','<span class="review-didCloseVoteFull"> - <span class="review-didCloseVote">Voted</span></span>');
-                            }
-                        }
+            function isQuestionClosed() {
+                return $('.special-status .question-status H2 B').filter(function() {
+                    return /hold|closed|marked/i.test($(this).text());
+                }).length > 0;
+            }
+            function isQuestionDeleted() {
+                return $('.question').first().is('.deleted-answer');
+            }
+            function showHasVoted(show) {
+                var title = document.querySelector('.review-title');
+                var didCloseVoteEl = title.parentNode.querySelector('.review-didCloseVoteFull');
+                if (show) {
+                    if(didCloseVoteEl) {
+                        didCloseVoteEl.style.display = '';
                     } else {
-                        if(didCloseVote) {
-                            didCloseVote.style.display = 'none';
+                        if(title) {
+                            title.insertAdjacentHTML('afterend','<span class="review-didCloseVoteFull"> - <span class="review-didCloseVote">Voted</span></span>');
                         }
                     }
+                } else {
+                    if(didCloseVoteEl) {
+                        didCloseVoteEl.style.display = 'none';
+                    }
+                }
+            }
+            StackExchange.using('inlineEditing', function () {
+                StackExchange.ready(function () {
+                    var hasVotedToClose = false;
+                    var hasVotedToDelete = false;
+                    var fetchDeleteTooltip = jQuery.Deferred(deferred => deferred.resolve());
+                    StackExchange.question.init(initInfo);
+                    if (document.querySelector('a[title^="You voted to close"]')) {
+                        hasVotedToClose = true;
+                    }
+                    const deleteButton = document.querySelector('a[title$="to delete this post"]');
+                    if (deleteButton) {
+                        //The queston can be and may have been voted to delete by this user.
+                        const deleteIdMatches = /\d+/.exec(deleteButton.id);
+                        const deleteId = deleteIdMatches ? deleteIdMatches[0] : null;
+                        if (deleteId) {
+                            //This GET may need to be delayed in order to slow down requests (if we end up being rate-limited).
+                            fetchDeleteTooltip = $.get(`/posts/${deleteId}/delete-tooltip`).done(newToolTipText => {
+                                if (/^You voted to delete/.test(newToolTipText)) {
+                                    hasVotedToDelete = true;
+                                }
+                                //Update the tooltip, to prevent fetching this information twice.
+                                deleteButton.classList.remove('load-tooltip-on-hover');
+                                deleteButton.title = newToolTipText;
+                                showHasVoted(hasVotedToDelete);
+                            });
+                        }
+                    }
+                    showHasVoted(hasVotedToClose);
                     StackExchange.comments.loadAll($('.question'));
+                    //Initialize snippets
                     StackExchange.using("snippets", function () {
                         StackExchange.snippets.initSnippetRenderer();
                         StackExchange.snippets.redraw();
                         document.querySelector('.review-spinner').style.display = 'none';
                         document.querySelector('.review-indicator .progress').textContent = '';
-                        //Remove the <script> this was loaded in.
-                        document.getElementById(questionInitId).remove();
+                        //Make sure everything's done (i.e. we have the delete tooltip)
+                        fetchDeleteTooltip.done(() => {
+                            if(hasVotedToClose) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-userHasVotedToClose', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(hasVotedToDelete) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-userHasVotedToDelete', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(isQuestionClosed()) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-questionIsClosed', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            if(isQuestionDeleted()) {
+                                window.dispatchEvent(new CustomEvent('magicTagReview-questionIsDeleted', {
+                                    bubbles: true,
+                                    cancelable: true
+                                }));
+                            }
+                            window.dispatchEvent(new CustomEvent('magicTagReview-questionFullyDisplayed', {
+                                bubbles: true,
+                                cancelable: true
+                            }));
+                            //Remove the <script> this was loaded in.
+                            document.getElementById(questionInitId).remove();
+                        });
                     });
                 });
             });
@@ -795,13 +1091,40 @@ document.addEventListener('DOMContentLoaded', async _ => {
         const display = current => new Promise(async (resolve, reject) => {
             reset(0,0,0,1);
 
-            const post = queue[current];
+            current = +current;
+            //Don't overrun the bounds of the queue.
+            if(!current || current < 0) {
+                current = 0;
+            }
+            if(current > queue.length - 1) {
+                current = queue.length - 1;
+            }
+            const post = question_list[queue[current]];
 
             if (post) {
+                //See if we should skip diplaying this question.
+                // Note: There currently isn't any way for questions to be marked undeleted or reopened.
+                if( ((post.userVotedToClose || post.userVotedToDelete) && advanceToNextQuestionIfSkipVoted(true)) ||
+                    ((post.questionIsClosed || post.closed_date) && advanceToNextQuestionIfSkipClosed(true)) ||
+                    (post.questionIsDeleted && advanceToNextQuestionIfSkipDeleted(true))
+                ) {
+                    //We did not display the question, but this is not a rejection (because we use await and don't want to throw).
+                    resolve(false);
+                    return;
+                }
+
                 nodes.title.href      = 'http://stackoverflow.com/q/' + post.question_id;
                 nodes.title.innerHTML = post.title;
 
                 nodes.question.innerHTML = await fetchQuestion(post);
+
+                //Listen for when the question is completely displayed.
+                const isDisplayedListener = e => {
+                    window.removeEventListener('magicTagReview-questionFullyDisplayed', isDisplayedListener, true);
+                    //Resolve the Promise with true to indicate that it was sucessful.
+                    resolve(true);
+                };
+                window.addEventListener('magicTagReview-questionFullyDisplayed', isDisplayedListener, true);
 
                 //Initialize the question, with comments
                 //Get a unique ID for this execution of inPageInitQuestionWithComments.
@@ -815,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 const prettyDate = time => {
                     if (time === null || time.length != 20) return;
 
-                    // firefox requires ISO 8601 formated dates
+                    //Firefox requires ISO 8601 formated dates
                     time = time.substr(0, 10) + "T" + time.substr(11, 10);
                     var date = new Date(time),
                         diff = (((new Date()).getTime() - date.getTime()) / 1000) + (getPageValue('StackExchange.options.serverTimeOffsetSec'), returnedPageValue),
@@ -864,11 +1187,11 @@ document.addEventListener('DOMContentLoaded', async _ => {
             }
             
             nodes.prev.disabled = !queue.length || current < 1;
-            nodes.next.disabled = !queue.length || current === queue.length - 1;
+            nodes.next.disabled = !queue.length || current >= queue.length - 1;
             nodes.position.value = queue.length ? `${current + 1}/${queue.length}` : '0/0';
         });
         
-        const delay = _ => new Promise(resolve => setTimeout(resolve));
+        const delay = milliseconds => new Promise(resolve => setTimeout(resolve, (milliseconds ? milliseconds : 0)));
         
         const filterQuestions = async question_list => {
             var performStart = performance.now();
@@ -966,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
             //Function to get the results for every active filter on a question.
             const filterQuestion = question => filterList.reduce((allResults, [filterKey, filter]) => Object.assign(allResults, {[filterKey]: filter(question)}), {});
             
-            const queue = await new Promise(async resolve => {
+            const newQueue = await new Promise(async resolve => {
                 const filteredQueue = [];
 
                 const isset = {
@@ -1012,29 +1335,33 @@ document.addEventListener('DOMContentLoaded', async _ => {
                     };
                     
                     //Add the question to the queue, if it matches at least one primary filter. Add the primary filter results to any accepted question.
-                    if(Object.values(primaryFilters).some(primeFilter => primeFilter)) filteredQueue.push(Object.assign(question, {primaryFilters}));
+                    if(Object.values(primaryFilters).some(primeFilter => primeFilter)) filteredQueue.push(index);
                 }
                 
                 resolve(filteredQueue);
             });
             
             //Don't hide the spinner here due to Chrome/Tampermonkey's issue with GM Storage being expensive.
-            //nodes.spinner.hide();
+            //Unless the queue is empty
+            if (newQueue.length === 0) {
+                nodes.spinner.hide();
+            } else {
+                if(GM_info.script.author) {
+                    nodes.indicator_progress.textContent = 'Waiting for data to store (Tampermonkey issue)';
+                }
+            }
             nodes.applyFilters.disabled = false;
             nodes.stopFilter.disabled = true;
             nodes.indicator_progress.textContent = '';
-            if(GM_info.script.author) {
-                nodes.indicator_progress.textContent = 'Waiting for data to store (Tampermonkey issue)';
-            }
             stop = false;
             
-            console.log(queue.map(post => ' - https://stackoverflow.com/q/' + post.question_id).join('\n'));
+            console.log(newQueue.map(index => ' - https://stackoverflow.com/q/' + question_list[index].question_id).join('\n'));
 
             var performElapsedSeconds = (performance.now() - performStart)/1000;
             var questionsPerSecond = question_list.length/performElapsedSeconds;
             console.log('Filtered', question_list.length.toLocaleString(), 'questions in', performElapsedSeconds.toLocaleString(), 'seconds at a rate of', questionsPerSecond.toLocaleString(), 'questions/s.');
             
-            return queue;
+            return newQueue;
         };
 
         /** End Functions **/
@@ -1056,17 +1383,33 @@ document.addEventListener('DOMContentLoaded', async _ => {
             event.preventDefault();
             queue = await filterQuestions(question_list);
             store.queue = JSON.stringify(queue);
-            display(+store.current);
+            display(store.current);
         }, false);
 
         nodes.prev.addEventListener('click', _ => {
-            store.current = +store.current - 1;
-            display(+store.current);
+            direction = -1;
+            advanceToNextQuestion(true);
         }, false);
 
         nodes.next.addEventListener('click', _ => {
-            store.current = +store.current + 1;
-            display(+store.current);
+            direction = 1;
+            advanceToNextQuestion(true);
+        }, false);
+
+        nodes.autoNext.addEventListener('click', _ => {
+            store.autoNext = nodes.autoNext.checked;
+        }, false);
+
+        nodes.skipVoted.addEventListener('click', _ => {
+            store.skipVoted = nodes.skipVoted.checked;
+        }, false);
+
+        nodes.skipClosed.addEventListener('click', _ => {
+            store.skipClosed = nodes.skipClosed.checked;
+        }, false);
+
+        nodes.skipDeleted.addEventListener('click', _ => {
+            store.skipDeleted = nodes.skipDeleted.checked;
         }, false);
         
         (_ => {
@@ -1111,7 +1454,26 @@ document.addEventListener('DOMContentLoaded', async _ => {
                             "CountNeededForStateChange":1
                         });
                         data.value = JSON.stringify(obj);
-                        window.dispatchEvent(new CustomEvent('magicTagReview-userCloseVoted', {
+                    }
+                    window.dispatchEvent(new CustomEvent('magicTagReview-userCloseVoted', {
+                        detail: data.xhr.responseURL,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                }
+            }
+        });
+
+        // Listen for delete votes
+        executeInPage(listener => addXHRListener(listener), true, 'magicTagReview-addXHRListener-watchDeleteVotes', {
+            regex: /\/posts\/\d+\/vote\/10$/,
+            get: data => {
+                //jQuery gets the responseText and parses it for JSON. This allows us to watch for jQuery doing that.
+                if(data.property === 'responseText') {
+                    const obj = JSON.parse(data.xhr.responseText);
+                    if(obj.Success) {
+                        window.dispatchEvent(new CustomEvent('magicTagReview-userDeleteVoted', {
+                            detail: data.xhr.responseURL,
                             bubbles: true,
                             cancelable: true
                         }));
@@ -1119,8 +1481,94 @@ document.addEventListener('DOMContentLoaded', async _ => {
                 }
             }
         });
-        window.addEventListener('magicTagReview-userCloseVoted', e => display(store.current), true);
-        
-        display(+store.current);
+
+        const advanceToNextQuestionIfAutoNext = (immediate) => {
+            if(store.autoNext) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipClosed = (immediate) => {
+            if(store.skipClosed) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipDeleted = (immediate) => {
+            if(store.skipDeleted) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        const advanceToNextQuestionIfSkipVoted = (immediate) => {
+            if(store.skipVoted) {
+                return advanceToNextQuestion(immediate);
+            }
+            return false;
+        }
+
+        var advanceQuestionTimeout = 0;
+        const advanceToNextQuestion = (immediate) => {
+            const current = store.current;
+            var newCurrent = Math.min(Math.max(current + direction, 0), queue.length - 1);
+            if(newCurrent == current) {
+                //Can't actually go to the next question.
+                return false;
+            } //else
+            store.current = newCurrent;
+            clearTimeout(advanceQuestionTimeout);
+            //Prior testing indicated that a delay between showing questions of 0.5s was sufficient to prevent being rate limited.
+            advanceQuestionTimeout = setTimeout(display, (immediate ? 0 : 500), store.current);
+            return true;
+        }
+
+        var previousUserCloseVoteURL = '';
+        window.addEventListener('magicTagReview-userCloseVoted', e => {
+            //Record that the question was close-voted by the user, so we don't have to display the question to find out.
+            //We may get multiple events per vote.
+            if(e.detail !== previousUserCloseVoteURL) {
+                //It's a new URL (new question).
+                previousUserCloseVoteURL = e.detail;
+                advanceToNextQuestionIfAutoNext();
+            }
+        }, true);
+
+        var previousUserDeleteVoteURL = '';
+        window.addEventListener('magicTagReview-userDeleteVoted', e => {
+            //Record that the question was delete-voted by the user, so we don't have to display the question to find out.
+            //We may get multiple events per vote.
+            if(e.detail !== previousUserDeleteVoteURL) {
+                //It's a new URL (new question).
+                previousUserDeleteVoteURL = e.detail;
+                advanceToNextQuestionIfAutoNext();
+            }
+        }, true);
+
+        //Get reports of question state once the question has been displayed (from the page context).
+        window.addEventListener('magicTagReview-userHasVotedToClose', e => {
+            //Record that the user previously close-voted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].userVotedToClose = true;
+            advanceToNextQuestionIfSkipVoted();
+        }, true);
+        window.addEventListener('magicTagReview-userHasVotedToDelete', e => {
+            //Record that the user previously delete-voted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].userVotedToDelete = true;
+            advanceToNextQuestionIfSkipVoted();
+        }, true);
+        window.addEventListener('magicTagReview-questionIsClosed', e => {
+            //Record that the question is closed, so we don't have to display the question to find out.
+            question_list[queue[store.current]].questionIsClosed = true;
+            advanceToNextQuestionIfSkipClosed();
+        }, true);
+        window.addEventListener('magicTagReview-questionIsDeleted', e => {
+            //Record that the question is deleted, so we don't have to display the question to find out.
+            question_list[queue[store.current]].questionIsDeleted = true;
+            advanceToNextQuestionIfSkipDeleted();
+        }, true);
+
+        display(store.current);
     }
 }, false);
