@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sticky vote controls
 // @namespace    http://github.com/TinyGiant/
-// @version      1.0.0.4
+// @version      1.0.0.5
 // @description  Makes the vote controls sticky
 // @author       @TinyGiant
 // @include      /^https?:\/\/(?!chat)\w*.?(stackexchange.com|stackoverflow.com|serverfault.com|superuser.com|askubuntu.com|stackapps.com|mathoverflow.net)\/.*/
@@ -16,7 +16,7 @@ document.body.insertAdjacentHTML("beforeend", `
         .question .vote,
         .answer .vote {
            position: sticky;
-           top: 0px;
+           top: 50px;
         }
     </style>
 `);
